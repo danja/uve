@@ -1,0 +1,29 @@
+{
+    "output": {
+        "filePath": "./repomix-uve.md",
+        "headerText": "UVE repo",
+        "removeComments": false
+    },
+    "include": [
+        "**/*"
+    ],
+    "ignore": {
+        "useDefaultPatterns": false,
+        "customPatterns": [
+            "package-lock.json",
+            "data",
+            "docs",
+            ".nyc_output",
+            ".env",
+            "**/_*",
+            "node_modules",
+            "*.log",
+            "**/*repomix*.txt",
+            "**/*repomix*.md",
+            "**/*.html",
+            "**/data/*",
+            "**/*copy*.js",
+            "**/conversations.json"
+        ]
+    }
+}

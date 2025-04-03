@@ -1,0 +1,32 @@
+{
+  "name": "uve",
+  "version": "0.1.0",
+  "description": "Universal Virtual Environment - 3D visualization for conceptual spaces",
+  "main": "src/core/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "jasmine",
+    "docs": "jsdoc -c jsdoc.json",
+    "rp": "repomix -c repomix.config.json ."
+  },
+  "dependencies": {
+    "loglevel": "^1.8.1",
+    "rdf-ext": "^2.5.0",
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "chai": "^4.3.7",
+    "jasmine": "^5.1.0",
+    "jsdoc": "^4.0.2",
+    "webpack": "^5.98.0"
+  },
+  "keywords": [
+    "rdf",
+    "3d",
+    "visualization",
+    "owl",
+    "threejs"
+  ],
+  "author": "",
+  "license": "MIT"
+}

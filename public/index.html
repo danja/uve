@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UVE - Universal Virtual Environment</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        #container {
+            width: 100%;
+            height: 100%;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="ui">
+        <button id="load-foaf">Load FOAF Example</button>
+    </div>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./node_modules/three/build/three.module.js",
+                "three/addons/": "./node_modules/three/examples/jsm/",
+                "rdf-ext": "./node_modules/rdf-ext/index.js"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import rdf from 'rdf-ext';
+        import { UVEApp } from './src/core/uve-core.js';
+        import { loadFOAFExample } from './src/examples/foaf-example.js';
+
+        // Add OrbitControls to THREE
+        THREE.OrbitControls = OrbitControls;
+
+        // Initialize the application
+        const container = document.getElementById('container');
+        const app = new UVEApp({
+            rdf: rdf,
+            three: THREE
+        });
+
+        app.initialize(container);
+
+        // Set up UI button
+        document.getElementById('load-foaf').addEventListener('click', () => {
+            loadFOAFExample(app, rdf);
+        });
+    </script>
+</body>
+</html>

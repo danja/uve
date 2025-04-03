@@ -1,0 +1,28 @@
+<!-- Import external libraries from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/loglevel@1.8.1/dist/loglevel.min.js"></script>
+  
+  <!-- Import UVE modules -->
+  <script src="js/core/uve-core.js" type="module"></script>
+  <script src="js/renderers/class-sphere-renderer.js" type="module"></script>
+  <script src="js/examples/foaf-example.js" type="module"></script>
+  
+  <!-- Main script -->
+  <script>
+    // Initialize once DOM is loaded
+    document.addEventListener('DOMContentLoaded', () => {
+      // Set up logging
+      log.setLevel(log.levels.INFO);
+      log.info('UVE initializing...');
+      
+      // Initialize application using globals exposed by the modules
+      const eventBus = new UVE.EventBus();
+      const app = new UVE.UVEApp({
+        eventBus: eventBus,
+        three: THREE
+      });
+      
+      // Rest of initialization code...
+    });
+  </script>
