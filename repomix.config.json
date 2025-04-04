@@ -10,6 +10,7 @@
     "ignore": {
         "useDefaultPatterns": false,
         "customPatterns": [
+            ".git",
             "package-lock.json",
             "data",
             "docs",
