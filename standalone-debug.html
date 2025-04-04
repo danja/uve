@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UVE Standalone Debug</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+        }
+        #three-view-container {
+            flex: 3;
+            background-color: #111133;
+        }
+        #rdf-view-container {
+            flex: 1;
+            background-color: #f5f5f5;
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 12px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="three-view-container"></div>
+        <div id="rdf-view-container"></div>
+    </div>
+    
+    <div class="controls">
+        <button id="loadFOAF">Load FOAF Example</button>
+    </div>
+
+    <!-- Load Three.js from CDN -->
+    <script src="https://unpkg.com/three@0.158.0/build/three.js"></script>
+    <script src="https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js"></script>
+    
+    <!-- Standalone UVE implementation -->
+    <script>
+        // Create UVE namespace
+        window.UVE = {};
+
+        // UVE Event class
+        UVE.UVEEvent = class {
+            constructor(type, data = {}) {
+                this.type = type;
+                this.data = data;
+                this.timestamp = Date.now();
+            }
+        };
+
+        // Event bus
+        UVE.EventBus = class {
+            constructor() {
+                this.subscribers = new Map();
+            }
+
+            subscribe(eventType, callback) {
+                if (!this.subscribers.has(eventType)) {
+                    this.subscribers.set(eventType, new Set());
+                }
+                this.subscribers.get(eventType).add(callback);
+                return () => {
+                    const subs = this.subscribers.get(eventType);
+                    if (subs) {
+                        subs.delete(callback);
+                        if (subs.size === 0) {
+                            this.subscribers.delete(eventType);
+                        }
+                    }
+                };
+            }
+
+            publish(event) {
+                const subs = this.subscribers.get(event.type);
+                if (subs) {
+                    subs.forEach(callback => {
+                        try {
+                            callback(event);
+                        } catch (error) {
+                            console.error(`Error in event handler for ${event.type}:`, error);
+                        }
+                    });
+                }
+            }
+        };
+
+        // Model Object class
+        UVE.ModelObject = class {
+            constructor(eventBus, id) {
+                this.eventBus = eventBus;
+                this.id = id;
+                this.properties = new Map();
+            }
+
+            get(key, defaultValue = null) {
+                return this.properties.has(key) ? this.properties.get(key) : defaultValue;
+            }
+
+            set(key, value) {
+                const oldValue = this.get(key);
+                this.properties.set(key, value);
+                this.eventBus.publish(new UVE.UVEEvent('model:property:change', {
+                    modelId: this.id,
+                    property: key,
+                    oldValue,
+                    newValue: value
+                }));
+            }
+        };
+
+        // RDF Model Manager
+        UVE.RDFModelManager = class {
+            constructor(eventBus) {
+                this.eventBus = eventBus;
+                this.classMap = new Map();
+            }
+
+            loadData(data) {
+                console.log("Loading data into RDF Model Manager:", data);
+                
+                if (data.classes) {
+                    data.classes.forEach(classData => {
+                        const modelObj = new UVE.ModelObject(this.eventBus, classData.id);
+                        Object.entries(classData).forEach(([key, value]) => {
+                            modelObj.set(key, value);
+                        });
+                        this.classMap.set(classData.id, modelObj);
+                    });
+
+                    this.eventBus.publish(new UVE.UVEEvent('rdf:classes:extracted', {
+                        count: this.classMap.size,
+                        modelManager: this
+                    }));
+                }
+            }
+
+            getClasses() {
+                return Array.from(this.classMap.values());
+            }
+        };
+
+        // Main UVE application
+        UVE.UVEApp = class {
+            constructor(config = {}) {
+                this.config = config;
+                this.eventBus = new UVE.EventBus();
+                this.three = config.three || THREE;
+                this.modelManager = new UVE.RDFModelManager(this.eventBus);
+                this.views = [];
+                this.objects = new Map();
+            }
+
+            initialize(container) {
+                console.log("Initializing UVE App in container:", container);
+                
+                // Create scene
+                this.scene = new this.three.Scene();
+                this.scene.background = new this.three.Color(0x111133);
+
+                // Create camera
+                this.camera = new this.three.PerspectiveCamera(
+                    75,
+                    container.clientWidth / container.clientHeight,
+                    0.1,
+                    1000
+                );
+                this.camera.position.z = 15;
+
+                // Create renderer
+                this.renderer = new this.three.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(container.clientWidth, container.clientHeight);
+                container.appendChild(this.renderer.domElement);
+
+                // Add orbit controls
+                this.controls = new THREE.OrbitControls(
+                    this.camera,
+                    this.renderer.domElement
+                );
+                this.controls.enableDamping = true;
+
+                // Add ambient light
+                const ambientLight = new this.three.AmbientLight(0x404040);
+                this.scene.add(ambientLight);
+
+                // Add directional light
+                const directionalLight = new this.three.DirectionalLight(0xffffff, 0.5);
+                directionalLight.position.set(1, 1, 1);
+                this.scene.add(directionalLight);
+
+                // Animation loop
+                const animate = () => {
+                    requestAnimationFrame(animate);
+                    this.controls.update();
+                    this.renderer.render(this.scene, this.camera);
+                };
+
+                animate();
+
+                // Handle window resize
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = container.clientWidth / container.clientHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(container.clientWidth, container.clientHeight);
+                });
+                
+                console.log("UVE App initialization complete");
+            }
+
+            clearScene() {
+                console.log("Clearing scene");
+                // Remove all objects except lights and camera
+                for (let i = this.scene.children.length - 1; i >= 0; i--) {
+                    const obj = this.scene.children[i];
+                    if (obj.type === 'Mesh' || obj.type === 'Line' || obj.type === 'Sprite') {
+                        this.scene.remove(obj);
+                    }
+                }
+                this.objects.clear();
+            }
+        };
+
+        // FOAF example implementation
+        UVE.FOAF = {
+            createFOAFExample: function() {
+                console.log("Creating FOAF example data");
+                
+                // Define people data
+                const people = [
+                    {
+                        id: 'alice',
+                        label: 'Alice Smith',
+                        email: 'alice@example.org',
+                        interests: ['Semantic Web', 'Artificial Intelligence', 'Rock Climbing'],
+                        knows: ['bob', 'charlie', 'dave']
+                    },
+                    {
+                        id: 'bob',
+                        label: 'Bob Johnson',
+                        email: 'bob@example.org',
+                        interests: ['Machine Learning', 'Photography', 'Chess'],
+                        knows: ['alice', 'charlie', 'eve']
+                    },
+                    {
+                        id: 'charlie',
+                        label: 'Charlie Brown',
+                        email: 'charlie@example.org',
+                        interests: ['Data Science', 'Piano', 'Hiking'],
+                        knows: ['alice', 'bob', 'dave']
+                    },
+                    {
+                        id: 'dave',
+                        label: 'Dave Williams',
+                        email: 'dave@example.org',
+                        interests: ['Virtual Reality', 'Guitar', 'Mountain Biking'],
+                        knows: ['alice', 'charlie']
+                    },
+                    {
+                        id: 'eve',
+                        label: 'Eve Davis',
+                        email: 'eve@example.org',
+                        interests: ['Cryptography', 'Painting', 'Yoga'],
+                        knows: ['bob']
+                    }
+                ];
+
+                // Create a class for Person
+                const personClass = {
+                    id: 'Person',
+                    label: 'Person',
+                    type: 'class',
+                    description: 'A person in the FOAF network',
+                    properties: ['name', 'email', 'knows', 'interests']
+                };
+
+                // Create relationship types
+                const relationships = [];
+
+                // Process people and create relationships
+                people.forEach(person => {
+                    person.type = 'Person';
+                    person.uri = `http://example.org/people/${person.id}`;
+
+                    // Add knows relationships
+                    person.knows.forEach(friendId => {
+                        relationships.push({
+                            source: person.id,
+                            target: friendId,
+                            type: 'knows',
+                            label: 'knows'
+                        });
+                    });
+                });
+
+                return {
+                    classes: [personClass, ...people],
+                    relationships: relationships
+                };
+            },
+
+            loadFOAFExample: function(app) {
+                console.log("Loading FOAF example into app");
+                
+                // Clear any existing objects
+                app.clearScene();
+
+                // Create the FOAF dataset
+                const dataset = this.createFOAFExample();
+                console.log("FOAF dataset created:", dataset);
+
+                // Load it into the model manager
+                app.modelManager.loadData(dataset);
+
+                // Create spheres for each person
+                this.createPersonSpheres(app, dataset);
+
+                // Notify that data has been loaded
+                app.eventBus.publish(new UVE.UVEEvent('rdf:loaded', {
+                    source: 'foaf-example',
+                    size: dataset.classes.length
+                }));
+            },
+
+            createPersonSpheres: function(app, dataset) {
+                console.log("Creating person spheres");
+                
+                // Filter for only person instances (not the class definition)
+                const people = dataset.classes.filter(item => item.type === 'Person');
+                console.log("Found people:", people);
+
+                // Color palette for spheres
+                const colors = [0x3498db, 0xe74c3c, 0x2ecc71, 0xf39c12, 0x9b59b6];
+
+                // Create a sphere for each person
+                people.forEach((person, index) => {
+                    // Calculate position in a circle
+                    const angle = (index / people.length) * Math.PI * 2;
+                    const radius = 8;
+                    const x = Math.cos(angle) * radius;
+                    const z = Math.sin(angle) * radius;
+
+                    // Create geometry
+                    const geometry = new THREE.SphereGeometry(1.5, 32, 32);
+
+                    // Create material with unique color
+                    const material = new THREE.MeshStandardMaterial({
+                        color: colors[index % colors.length],
+                        transparent: true,
+                        opacity: 0.8,
+                        metalness: 0.2,
+                        roughness: 0.5
+                    });
+
+                    // Create mesh
+                    const sphere = new THREE.Mesh(geometry, material);
+                    sphere.position.set(x, 0, z);
+
+                    // Store metadata
+                    sphere.userData = {
+                        personId: person.id,
+                        name: person.label,
+                        email: person.email,
+                        interests: person.interests
+                    };
+
+                    // Add to scene
+                    app.scene.add(sphere);
+                    app.objects.set(person.id, sphere);
+                    console.log(`Added sphere for ${person.label} at position (${x}, 0, ${z})`);
+
+                    // Add label above the sphere
+                    this.addPersonLabel(app, sphere, person.label);
+                });
+
+                // Create relationship lines
+                this.createRelationshipLines(app, dataset);
+            },
+
+            addPersonLabel: function(app, sphere, name) {
+                // Create canvas for text
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 256;
+                canvas.height = 128;
+
+                // Fill background
+                context.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Add text
+                context.font = 'bold 24px Arial';
+                context.fillStyle = '#000000';
+                context.textAlign = 'center';
+                context.textBaseline = 'middle';
+                context.fillText(name, canvas.width / 2, canvas.height / 2);
+
+                // Create texture
+                const texture = new THREE.CanvasTexture(canvas);
+
+                // Create sprite material
+                const material = new THREE.SpriteMaterial({
+                    map: texture,
+                    transparent: true
+                });
+
+                // Create sprite
+                const sprite = new THREE.Sprite(material);
+                sprite.scale.set(2.5, 1.25, 1);
+                sprite.position.y = 2.5; // Position above sphere
+
+                // Add to sphere
+                sphere.add(sprite);
+            },
+
+            createRelationshipLines: function(app, dataset) {
+                console.log("Creating relationship lines");
+                
+                // Create a line for each relationship
+                dataset.relationships.forEach(rel => {
+                    const sourceSphere = app.objects.get(rel.source);
+                    const targetSphere = app.objects.get(rel.target);
+
+                    if (sourceSphere && targetSphere) {
+                        // Create points for the line
+                        const sourcePos = sourceSphere.position.clone();
+                        const targetPos = targetSphere.position.clone();
+
+                        // Create a curved line
+                        const mid = sourcePos.clone().add(targetPos).multiplyScalar(0.5);
+                        mid.y += 2; // Add a slight curve upward
+
+                        // Create a curve
+                        const curve = new THREE.QuadraticBezierCurve3(
+                            sourcePos,
+                            mid,
+                            targetPos
+                        );
+
+                        // Create points along the curve
+                        const points = curve.getPoints(20);
+
+                        // Create geometry
+                        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+                        // Create material
+                        const material = new THREE.LineBasicMaterial({
+                            color: 0x999999,
+                            linewidth: 2
+                        });
+
+                        // Create line
+                        const line = new THREE.Line(geometry, material);
+
+                        // Add to scene
+                        app.scene.add(line);
+                        console.log(`Added relationship line from ${rel.source} to ${rel.target}`);
+
+                        // Add relationship label
+                        this.addRelationshipLabel(app, mid, rel.label);
+                    } else {
+                        console.warn(`Missing spheres for relationship: ${rel.source} -> ${rel.target}`);
+                    }
+                });
+            },
+
+            addRelationshipLabel: function(app, position, text) {
+                // Create canvas for text
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 128;
+                canvas.height = 64;
+
+                // Fill background
+                context.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Add text
+                context.font = '16px Arial';
+                context.fillStyle = '#000000';
+                context.textAlign = 'center';
+                context.textBaseline = 'middle';
+                context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+                // Create texture
+                const texture = new THREE.CanvasTexture(canvas);
+
+                // Create sprite material
+                const material = new THREE.SpriteMaterial({
+                    map: texture,
+                    transparent: true
+                });
+
+                // Create sprite
+                const sprite = new THREE.Sprite(material);
+                sprite.scale.set(1.5, 0.75, 1);
+                sprite.position.copy(position);
+
+                // Add to scene
+                app.scene.add(sprite);
+            }
+        };
+    </script>
+    
+    <!-- Application initialization -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("DOM loaded, initializing application");
+            
+            // Get container element
+            const container = document.getElementById('three-view-container');
+            
+            try {
+                // Create UVE application
+                const app = new UVE.UVEApp({
+                    three: THREE
+                });
+                
+                console.log("Created UVE application", app);
+                
+                // Initialize the application
+                app.initialize(container);
+                console.log("Initialized UVE application");
+                
+                // Add debug helpers
+                const gridHelper = new THREE.GridHelper(20, 20);
+                app.scene.add(gridHelper);
+                console.log("Added grid helper");
+                
+                const axesHelper = new THREE.AxesHelper(5);
+                app.scene.add(axesHelper);
+                console.log("Added axes helper");
+                
+                // Set up button to load FOAF example
+                const loadFOAFButton = document.getElementById('loadFOAF');
+                loadFOAFButton.addEventListener('click', function() {
+                    console.log("Load FOAF button clicked");
+                    UVE.FOAF.loadFOAFExample(app);
+                });
+                
+                // Load FOAF example automatically
+                console.log("Loading FOAF example automatically");
+                UVE.FOAF.loadFOAFExample(app);
+                
+                // Store app globally for debugging
+                window.uveApp = app;
+                
+            } catch (error) {
+                console.error("Error initializing application:", error);
+            }
+        });
+    </script>
+</body>
+</html>

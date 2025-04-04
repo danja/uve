@@ -65,6 +65,25 @@ class ThreeView {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x111133);
 
+    // Add these lines to src/view/threeView/threeView.js in the initThree() method
+    // after creating the scene:
+
+    // Add debug grid and axes to help with orientation
+    const gridHelper = new THREE.GridHelper(20, 20);
+    this.scene.add(gridHelper);
+
+    const axesHelper = new THREE.AxesHelper(5);
+    this.scene.add(axesHelper);
+
+    // Add a simple sphere to verify rendering is working
+    const debugSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(2, 32, 32),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 })
+    );
+    debugSphere.position.set(0, 0, 0);
+    this.scene.add(debugSphere);
+
+    console.log('Debug objects added to scene');
     // Create camera
     this.camera = new THREE.PerspectiveCamera(
       config.visualization.camera.fov,

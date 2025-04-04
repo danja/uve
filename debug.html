@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UVE Debug</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+        }
+        #three-view-container {
+            flex: 3;
+            background-color: #111133;
+        }
+        #rdf-view-container {
+            flex: 1;
+            background-color: #f5f5f5;
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 12px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="three-view-container"></div>
+        <div id="rdf-view-container"></div>
+    </div>
+    
+    <div class="controls">
+        <button id="loadFOAF">Load FOAF Example</button>
+    </div>
+
+    <!-- Load Three.js -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- Make debugging easier -->
+    <script>
+        // Console overrides to make debugging more visible
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        
+        console.log = function() {
+            originalLog.apply(console, ['🟢', ...arguments]);
+        };
+        
+        console.warn = function() {
+            originalWarn.apply(console, ['🟠', ...arguments]);
+        };
+        
+        console.error = function() {
+            originalError.apply(console, ['🔴', ...arguments]);
+        };
+    </script>
+
+    <!-- Load our mock fs implementation -->
+    <script>
+        // Create a simple mock fs implementation
+        window.fs = {
+            readFile: async function(path, options = {}) {
+                console.log(`Mock fs.readFile called: ${path}`);
+                return options.encoding ? "Mock file content" : new Uint8Array([1, 2, 3]);
+            },
+            writeFile: async function(path, data, options = {}) {
+                console.log(`Mock fs.writeFile called: ${path}`);
+                return Promise.resolve();
+            },
+            exists: async function(path) {
+                console.log(`Mock fs.exists called: ${path}`);
+                return Promise.resolve(false);
+            },
+            readdir: async function(path) {
+                console.log(`Mock fs.readdir called: ${path}`);
+                return Promise.resolve([]);
+            }
+        };
+        console.log("Mock fs initialized");
+    </script>
+
+    <!-- Load UVE scripts -->
+    <script src="_src_/js/uve-core.js"></script>
+    <script src="_src_/js/foaf-example.js"></script>
+    
+    <!-- Application initialization -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("DOM loaded, initializing application");
+            
+            // Get container element
+            const container = document.getElementById('three-view-container');
+            
+            try {
+                // Make THREE and OrbitControls available globally
+                window.THREE = THREE;
+                window.OrbitControls = THREE.OrbitControls;
+                
+                // Create UVE application
+                const app = new UVE.UVEApp({
+                    three: THREE // Pass Three.js instance
+                });
+                
+                console.log("Created UVE application", app);
+                
+                // Initialize the application
+                app.initialize(container);
+                console.log("Initialized UVE application");
+                
+                // Set up button to load FOAF example
+                const loadFOAFButton = document.getElementById('loadFOAF');
+                loadFOAFButton.addEventListener('click', function() {
+                    console.log("Load FOAF button clicked");
+                    UVE.FOAF.loadFOAFExample(app);
+                });
+                
+                // Load FOAF example automatically
+                console.log("Loading FOAF example automatically");
+                UVE.FOAF.loadFOAFExample(app);
+                
+                // Add a debug sphere
+                console.log("Adding debug objects");
+                const debugSphere = new THREE.Mesh(
+                    new THREE.SphereGeometry(2, 32, 32),
+                    new THREE.MeshBasicMaterial({ color: 0xff0000 })
+                );
+                debugSphere.position.set(0, 0, 0);
+                app.scene.add(debugSphere);
+                
+                // Add grid and axes
+                const gridHelper = new THREE.GridHelper(20, 20);
+                app.scene.add(gridHelper);
+                
+                const axesHelper = new THREE.AxesHelper(5);
+                app.scene.add(axesHelper);
+                
+                console.log("Debug objects added");
+            } catch (error) {
+                console.error("Error initializing application:", error);
+            }
+        });
+    </script>
+</body>
+</html>
