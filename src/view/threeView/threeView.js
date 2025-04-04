@@ -302,22 +302,34 @@ class ThreeView {
     const sourceUriString = relationshipEntity.sourceClassUri.value;
     const targetUriString = relationshipEntity.targetClassUri.value;
 
+    console.log('Looking for spheres:', {
+      source: sourceUriString,
+      sourceSphere: this.spheres.has(sourceUriString),
+      target: targetUriString,
+      targetSphere: this.spheres.has(targetUriString)
+    });
+
+    // Try to find spheres with various URI patterns
+    // Sometimes the URI can be slightly different (with or without trailing slash)
+    const sourceSphere = this.findSphereByUri(sourceUriString);
+    const targetSphere = this.findSphereByUri(targetUriString);
+
     // Skip if we don't have the source or target class
-    if (!this.spheres.has(sourceUriString) || !this.spheres.has(targetUriString)) {
-      this.log.warn(`Cannot render relationship ${uriString}: missing source or target class`);
+    if (!sourceSphere || !targetSphere) {
+      this.log.warn(`Cannot render relationship ${uriString}: missing ` +
+        (sourceSphere ? '' : 'source ') +
+        (targetSphere ? '' : 'target'));
       console.warn(`Cannot render relationship ${uriString}: missing ` +
-        (this.spheres.has(sourceUriString) ? '' : 'source ') +
-        (this.spheres.has(targetUriString) ? '' : 'target'));
+        (sourceSphere ? '' : 'source ') +
+        (targetSphere ? '' : 'target'));
       return null;
     }
 
-    // Get source and target spheres
-    const sourceSphere = this.spheres.get(sourceUriString);
-    const targetSphere = this.spheres.get(targetUriString);
-
     // Create pipe for the relationship
     try {
-      console.log('Creating pipe for relationship:', relationshipEntity.label);
+      console.log('Creating pipe for relationship:', relationshipEntity.label,
+        'from', sourceSphere.classEntity.label, 'to', targetSphere.classEntity.label);
+
       const pipe = new Pipe({
         relationshipEntity,
         sourceSphere,
@@ -336,6 +348,42 @@ class ThreeView {
       console.error('Error creating pipe for relationship:', relationshipEntity.label, error);
       return null;
     }
+  }
+
+  /**
+   * Find a sphere by URI, trying different variations of the URI
+   * @param {string} uri - URI to search for
+   * @returns {Sphere|null} The found sphere or null
+   */
+  findSphereByUri(uri) {
+    // Try exact match first
+    if (this.spheres.has(uri)) {
+      return this.spheres.get(uri);
+    }
+
+    // Try with/without trailing slash
+    const altUri = uri.endsWith('/') ? uri.slice(0, -1) : uri + '/';
+    if (this.spheres.has(altUri)) {
+      return this.spheres.get(altUri);
+    }
+
+    // Try simpler version (just the local name)
+    const localName = uri.split('/').pop().split('#').pop();
+
+    // Look for a sphere that has this local name in its URI
+    for (const [sphereUri, sphere] of this.spheres.entries()) {
+      if (sphereUri.includes(localName)) {
+        console.log(`Found sphere with similar URI: ${sphereUri} for ${uri}`);
+        return sphere;
+      }
+    }
+
+    // Print available sphere URIs for debugging
+    if (this.spheres.size > 0) {
+      console.log('Available sphere URIs:', Array.from(this.spheres.keys()));
+    }
+
+    return null;
   }
 
   /**

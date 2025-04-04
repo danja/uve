@@ -1,0 +1,89 @@
+mindmap
+  root((UVE))
+    Architecture
+      Model-View
+      Pub-Sub Messaging
+      Storage Abstraction
+      RDF/OWL Data Model
+    Components
+      Core Layer
+        eventBus.js
+        config.js
+      Model Layer
+        rdfModel.js
+        conceptModel.js
+        Entity Types
+          classEntity.js
+          relationshipEntity.js
+          interfaceEntity.js
+      View Layer
+        threeView.js
+          sphere.js
+          pipe.js
+          port.js
+          controls.js
+        rdfFileView.js
+      Storage Layer
+        storageService.js
+        fsStorageService.js
+        sparqlStorageService.js
+        storageManager.js
+      Examples
+        foafExample.js
+    Current State
+      Implemented
+        Core Architecture
+        Event-based Communication
+        Storage Abstraction
+        RDF Data Model
+        Basic Visualization
+        RDF Editor
+        FOAF Example
+      Working Features
+        3D Scene Initialization
+        Debug Objects Rendering
+        RDF Data Editing
+        Model Transformation
+      Not Working
+        Relationship Rendering
+        Class Instance Visualization
+        Entering/Exiting Spheres
+    Issues
+      Relationship Rendering
+        URI Matching Problems
+        Missing Source/Target Classes
+      Class Instance Detection
+        Inconsistent URI Formats
+        Incomplete FOAF Processing
+      Debug Visualization
+        Only Red Sphere Visible
+      URI Mismatches
+        Different URI Representations
+    Next Steps
+      Fix Relationship Rendering
+        Debug Relationship Pipeline
+        Fix URI Matching
+        Improve Class Instance Recognition
+      Complete Interaction Features
+        Enter/Exit Functionality
+        Selection Highlighting
+        Information Panel
+      Enhance RDF Model Support
+        Custom Vocabularies
+        Better Property Handling
+      Implement Advanced Navigation
+        First-person Camera Controls
+        Collision Detection
+        Smooth Transitions
+      Optimize Performance
+        Level-of-Detail
+        Object Pooling
+        Query Optimization
+      Enhance Visual Appearance
+        Materials and Textures
+        Visual Effects
+        Better Labels
+      Complete Documentation
+        API Documentation
+        User Guide
+        More Examples

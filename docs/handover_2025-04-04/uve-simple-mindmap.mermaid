@@ -1,0 +1,82 @@
+graph TD
+    UVE(UVE - Universal Virtual Environment) --- Architecture
+    UVE --- Components
+    UVE --- CurrentState[Current State]
+    UVE --- Issues
+    UVE --- NextSteps[Next Steps]
+    
+    Architecture --- A1[Model-View Pattern]
+    Architecture --- A2[Pub-Sub Messaging]
+    Architecture --- A3[Storage Abstraction]
+    Architecture --- A4[RDF/OWL Data Model]
+    
+    Components --- Core
+    Components --- Model
+    Components --- View
+    Components --- Storage
+    Components --- Examples
+    
+    Core --- C1[eventBus.js]
+    Core --- C2[config.js]
+    
+    Model --- M1[rdfModel.js]
+    Model --- M2[conceptModel.js]
+    Model --- EntityTypes[Entity Types]
+    EntityTypes --- E1[classEntity.js]
+    EntityTypes --- E2[relationshipEntity.js]
+    EntityTypes --- E3[interfaceEntity.js]
+    
+    View --- V1[threeView.js]
+    View --- V2[rdfFileView.js]
+    V1 --- ThreeComponents[Three.js Components]
+    ThreeComponents --- T1[sphere.js]
+    ThreeComponents --- T2[pipe.js]
+    ThreeComponents --- T3[port.js]
+    ThreeComponents --- T4[controls.js]
+    
+    Storage --- S1[storageService.js]
+    Storage --- S2[fsStorageService.js]
+    Storage --- S3[sparqlStorageService.js]
+    Storage --- S4[storageManager.js]
+    
+    Examples --- EX1[foafExample.js]
+    
+    CurrentState --- Implemented
+    CurrentState --- NotWorking[Not Working]
+    
+    Implemented --- I1[Core Architecture]
+    Implemented --- I2[Event System]
+    Implemented --- I3[Storage Layer]
+    Implemented --- I4[RDF Data Model]
+    Implemented --- I5[Basic Three.js Setup]
+    Implemented --- I6[RDF Editor]
+    
+    NotWorking --- N1[Relationship Rendering]
+    NotWorking --- N2[Class Instance Visualization]
+    NotWorking --- N3[Sphere Navigation]
+    
+    Issues --- IS1[Relationship Rendering Problems]
+    Issues --- IS2[URI Matching Issues]
+    Issues --- IS3[Class Instance Detection]
+    Issues --- IS4[Only Debug Sphere Visible]
+    
+    NextSteps --- NS1[Fix Relationship Rendering]
+    NextSteps --- NS2[Complete Interaction Features]
+    NextSteps --- NS3[Enhance RDF Model Support]
+    NextSteps --- NS4[Implement Advanced Navigation]
+    NextSteps --- NS5[Optimize Performance]
+    NextSteps --- NS6[Enhance Visual Appearance]
+    NextSteps --- NS7[Complete Documentation]
+    
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    classDef center fill:#ff9900,stroke:#333,stroke-width:2px;
+    classDef section fill:#ccf,stroke:#333,stroke-width:1px;
+    classDef implemented fill:#cfc,stroke:#333,stroke-width:1px;
+    classDef issue fill:#fcc,stroke:#333,stroke-width:1px;
+    classDef next fill:#cff,stroke:#333,stroke-width:1px;
+    
+    class UVE center;
+    class Architecture,Components,CurrentState,Issues,NextSteps section;
+    class Implemented,I1,I2,I3,I4,I5,I6 implemented;
+    class NotWorking,Issues,IS1,IS2,IS3,IS4,N1,N2,N3 issue;
+    class NextSteps,NS1,NS2,NS3,NS4,NS5,NS6,NS7 next;

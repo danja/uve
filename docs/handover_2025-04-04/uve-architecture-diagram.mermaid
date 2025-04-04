@@ -1,0 +1,69 @@
+flowchart TB
+    subgraph core["Core Layer"]
+        eventBus["eventBus.js\nPub-sub messaging"]
+        config["config.js\nSystem configuration"]
+    end
+    
+    subgraph model["Model Layer"]
+        rdfModel["rdfModel.js\nRDF datasets"]
+        conceptModel["conceptModel.js\nDomain entities"]
+        
+        subgraph entities["Entity Types"]
+            classEntity["classEntity.js"]
+            relationshipEntity["relationshipEntity.js"]
+            interfaceEntity["interfaceEntity.js"]
+        end
+        
+        rdfModel --> conceptModel
+        conceptModel --> entities
+    end
+    
+    subgraph view["View Layer"]
+        threeView["threeView.js\n3D visualization"]
+        rdfView["rdfFileView.js\nRDF editing"]
+        
+        subgraph components["ThreeJS Components"]
+            sphere["sphere.js"]
+            pipe["pipe.js"]
+            port["port.js"]
+            controls["controls.js"]
+        end
+        
+        threeView --> components
+    end
+    
+    subgraph storage["Storage Layer"]
+        storageService["storageService.js\nAbstract interface"]
+        fsStorage["fsStorageService.js\nFilesystem impl"]
+        sparqlStorage["sparqlStorageService.js\nSPARQL impl"]
+        storageManager["storageManager.js\nUnified access"]
+        
+        storageService --> |extends| fsStorage
+        storageService --> |extends| sparqlStorage
+        storageManager --> fsStorage
+        storageManager --> sparqlStorage
+    end
+    
+    subgraph examples["Examples"]
+        foaf["foafExample.js\nFOAF data"]
+    end
+    
+    threeView --> conceptModel
+    rdfView --> rdfModel
+    conceptModel --> eventBus
+    rdfModel --> storageManager
+    foaf --> rdfModel
+    eventBus --> threeView
+    eventBus --> rdfView
+    
+    classDef core fill:#ffcc99,stroke:#ff9933,stroke-width:2px;
+    classDef model fill:#ccffcc,stroke:#66cc66,stroke-width:2px;
+    classDef view fill:#ccccff,stroke:#6666cc,stroke-width:2px;
+    classDef storage fill:#ffccff,stroke:#cc66cc,stroke-width:2px;
+    classDef examples fill:#ffffcc,stroke:#cccc66,stroke-width:2px;
+    
+    class core core;
+    class model,entities model;
+    class view,components view;
+    class storage storage;
+    class examples examples;

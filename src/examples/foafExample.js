@@ -28,44 +28,15 @@ export function createFOAFExample() {
     uve: rdf.namespace('http://uve.example.org/ns#')
   };
 
-  // Define FOAF classes
+  // Define RDF class for Person
+  // First, define Person as an RDF class
   dataset.add(rdf.quad(ns.foaf.Person, ns.rdf.type, ns.rdfs.Class));
   dataset.add(rdf.quad(ns.foaf.Person, ns.rdfs.label, rdf.literal('Person')));
 
   dataset.add(rdf.quad(ns.foaf.Group, ns.rdf.type, ns.rdfs.Class));
   dataset.add(rdf.quad(ns.foaf.Group, ns.rdfs.label, rdf.literal('Group')));
 
-  dataset.add(rdf.quad(ns.foaf.Organization, ns.rdf.type, ns.rdfs.Class));
-  dataset.add(rdf.quad(ns.foaf.Organization, ns.rdfs.label, rdf.literal('Organization')));
-
-  // Add interface to Person
-  dataset.add(rdf.quad(ns.ex.Identifiable, ns.rdf.type, ns.uve.Interface));
-  dataset.add(rdf.quad(ns.ex.Identifiable, ns.rdfs.label, rdf.literal('Identifiable')));
-  dataset.add(rdf.quad(ns.foaf.Person, ns.uve.hasInterface, ns.ex.Identifiable));
-
-  // Add methods to the interface
-  const getIdMethod = rdf.blankNode();
-  dataset.add(rdf.quad(ns.ex.Identifiable, ns.uve.hasMethod, getIdMethod));
-  dataset.add(rdf.quad(getIdMethod, ns.rdfs.label, rdf.literal('getId')));
-  dataset.add(rdf.quad(getIdMethod, ns.uve.hasReturnType, rdf.literal('string')));
-
-  // Add Social interface to Person
-  dataset.add(rdf.quad(ns.ex.Social, ns.rdf.type, ns.uve.Interface));
-  dataset.add(rdf.quad(ns.ex.Social, ns.rdfs.label, rdf.literal('Social')));
-  dataset.add(rdf.quad(ns.foaf.Person, ns.uve.hasInterface, ns.ex.Social));
-
-  // Add methods to the Social interface
-  const addFriendMethod = rdf.blankNode();
-  dataset.add(rdf.quad(ns.ex.Social, ns.uve.hasMethod, addFriendMethod));
-  dataset.add(rdf.quad(addFriendMethod, ns.rdfs.label, rdf.literal('addFriend')));
-  dataset.add(rdf.quad(addFriendMethod, ns.uve.hasReturnType, rdf.literal('void')));
-
-  const friendParam = rdf.blankNode();
-  dataset.add(rdf.quad(addFriendMethod, ns.uve.hasParameter, friendParam));
-  dataset.add(rdf.quad(friendParam, ns.rdfs.label, rdf.literal('friend')));
-  dataset.add(rdf.quad(friendParam, ns.uve.hasType, rdf.literal('Person')));
-
-  // Define FOAF properties
+  // Define properties for Person
   dataset.add(rdf.quad(ns.foaf.name, ns.rdf.type, ns.rdf.Property));
   dataset.add(rdf.quad(ns.foaf.name, ns.rdfs.label, rdf.literal('name')));
   dataset.add(rdf.quad(ns.foaf.name, ns.rdfs.domain, ns.foaf.Person));
@@ -76,53 +47,32 @@ export function createFOAFExample() {
   dataset.add(rdf.quad(ns.foaf.mbox, ns.rdfs.domain, ns.foaf.Person));
   dataset.add(rdf.quad(ns.foaf.mbox, ns.rdfs.range, ns.xsd.string));
 
+  // Define knows relationship explicitly as a Property with domain and range
   dataset.add(rdf.quad(ns.foaf.knows, ns.rdf.type, ns.rdf.Property));
   dataset.add(rdf.quad(ns.foaf.knows, ns.rdfs.label, rdf.literal('knows')));
   dataset.add(rdf.quad(ns.foaf.knows, ns.rdfs.domain, ns.foaf.Person));
   dataset.add(rdf.quad(ns.foaf.knows, ns.rdfs.range, ns.foaf.Person));
 
-  dataset.add(rdf.quad(ns.foaf.member, ns.rdf.type, ns.rdf.Property));
-  dataset.add(rdf.quad(ns.foaf.member, ns.rdfs.label, rdf.literal('member')));
-  dataset.add(rdf.quad(ns.foaf.member, ns.rdfs.domain, ns.foaf.Group));
-  dataset.add(rdf.quad(ns.foaf.member, ns.rdfs.range, ns.foaf.Person));
-
-  // Create 5 friends
-  const friends = [
-    {
-      uri: ns.ex('alice'),
-      name: 'Alice',
-      email: 'alice@example.org'
-    },
-    {
-      uri: ns.ex('bob'),
-      name: 'Bob',
-      email: 'bob@example.org'
-    },
-    {
-      uri: ns.ex('charlie'),
-      name: 'Charlie',
-      email: 'charlie@example.org'
-    },
-    {
-      uri: ns.ex('diana'),
-      name: 'Diana',
-      email: 'diana@example.org'
-    },
-    {
-      uri: ns.ex('eve'),
-      name: 'Eve',
-      email: 'eve@example.org'
-    }
+  // Create 5 friend instances
+  const people = [
+    { id: 'alice', name: 'Alice Smith', email: 'alice@example.org' },
+    { id: 'bob', name: 'Bob Johnson', email: 'bob@example.org' },
+    { id: 'charlie', name: 'Charlie Brown', email: 'charlie@example.org' },
+    { id: 'diana', name: 'Diana Parker', email: 'diana@example.org' },
+    { id: 'eve', name: 'Eve Davis', email: 'eve@example.org' }
   ];
 
-  // Add friend data to dataset
-  friends.forEach(friend => {
-    dataset.add(rdf.quad(friend.uri, ns.rdf.type, ns.foaf.Person));
-    dataset.add(rdf.quad(friend.uri, ns.foaf.name, rdf.literal(friend.name)));
-    dataset.add(rdf.quad(friend.uri, ns.foaf.mbox, rdf.literal(friend.email)));
+  // Add each person
+  people.forEach(person => {
+    const personUri = ns.ex(person.id);
+
+    // Define the person as an instance of foaf:Person
+    dataset.add(rdf.quad(personUri, ns.rdf.type, ns.foaf.Person));
+    dataset.add(rdf.quad(personUri, ns.foaf.name, rdf.literal(person.name)));
+    dataset.add(rdf.quad(personUri, ns.foaf.mbox, rdf.literal(person.email)));
   });
 
-  // Create friendships (not all combinations, just some examples)
+  // Define friendships (bi-directional for some, one-way for others)
   // Alice knows Bob and Charlie
   dataset.add(rdf.quad(ns.ex('alice'), ns.foaf.knows, ns.ex('bob')));
   dataset.add(rdf.quad(ns.ex('alice'), ns.foaf.knows, ns.ex('charlie')));
@@ -143,13 +93,42 @@ export function createFOAFExample() {
   dataset.add(rdf.quad(ns.ex('eve'), ns.foaf.knows, ns.ex('charlie')));
   dataset.add(rdf.quad(ns.ex('eve'), ns.foaf.knows, ns.ex('diana')));
 
-  // Create a group
+  // Add some custom interfaces
+  // Add Identifiable interface to Person
+  dataset.add(rdf.quad(ns.ex.Identifiable, ns.rdf.type, ns.uve.Interface));
+  dataset.add(rdf.quad(ns.ex.Identifiable, ns.rdfs.label, rdf.literal('Identifiable')));
+  dataset.add(rdf.quad(ns.foaf.Person, ns.uve.hasInterface, ns.ex.Identifiable));
+
+  // Add getId method to Identifiable interface
+  const getIdMethod = rdf.blankNode();
+  dataset.add(rdf.quad(ns.ex.Identifiable, ns.uve.hasMethod, getIdMethod));
+  dataset.add(rdf.quad(getIdMethod, ns.rdfs.label, rdf.literal('getId')));
+  dataset.add(rdf.quad(getIdMethod, ns.uve.hasReturnType, rdf.literal('string')));
+
+  // Add Social interface to Person
+  dataset.add(rdf.quad(ns.ex.Social, ns.rdf.type, ns.uve.Interface));
+  dataset.add(rdf.quad(ns.ex.Social, ns.rdfs.label, rdf.literal('Social')));
+  dataset.add(rdf.quad(ns.foaf.Person, ns.uve.hasInterface, ns.ex.Social));
+
+  // Add addFriend method to Social interface
+  const addFriendMethod = rdf.blankNode();
+  dataset.add(rdf.quad(ns.ex.Social, ns.uve.hasMethod, addFriendMethod));
+  dataset.add(rdf.quad(addFriendMethod, ns.rdfs.label, rdf.literal('addFriend')));
+  dataset.add(rdf.quad(addFriendMethod, ns.uve.hasReturnType, rdf.literal('void')));
+
+  // Add parameter to addFriend method
+  const friendParam = rdf.blankNode();
+  dataset.add(rdf.quad(addFriendMethod, ns.uve.hasParameter, friendParam));
+  dataset.add(rdf.quad(friendParam, ns.rdfs.label, rdf.literal('friend')));
+  dataset.add(rdf.quad(friendParam, ns.uve.hasType, rdf.literal('Person')));
+
+  // Create a Group
   dataset.add(rdf.quad(ns.ex('friends-group'), ns.rdf.type, ns.foaf.Group));
   dataset.add(rdf.quad(ns.ex('friends-group'), ns.foaf.name, rdf.literal('Friends Group')));
 
-  // Add all friends to the group
-  friends.forEach(friend => {
-    dataset.add(rdf.quad(ns.ex('friends-group'), ns.foaf.member, friend.uri));
+  // Add all friends to the Group
+  people.forEach(person => {
+    dataset.add(rdf.quad(ns.ex('friends-group'), ns.foaf.member, ns.ex(person.id)));
   });
 
   // Save this dataset to storage for later retrieval
@@ -165,8 +144,10 @@ export function createFOAFExample() {
  */
 async function saveFOAFExample(dataset) {
   try {
-    // Create a serializer for Turtle format
-    const serializer = new rdf.formats.serializers.TurtleSerializer();
+    console.log('Serializing FOAF example to Turtle');
+
+    // Use serializer from RDF-Ext
+    const serializer = new rdf.serializers.TurtleSerializer();
     const turtleData = await serializer.serialize(dataset);
 
     // Save to storage
@@ -194,7 +175,7 @@ export async function loadFOAFExample() {
       console.log('FOAF data loaded from storage, parsing...');
 
       // Parse the Turtle data
-      const parser = new rdf.formats.parsers.TurtleParser();
+      const parser = new rdf.parsers.TurtleParser();
       const dataset = await parser.parse(turtleData);
       console.log(`FOAF dataset parsed with ${dataset.size} triples`);
       return dataset;

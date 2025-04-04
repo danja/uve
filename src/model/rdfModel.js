@@ -273,6 +273,24 @@ class RDFModel {
   _getSerializer(format) {
     return rdf.formats.serializers.get(format);
   }
+
+  /**
+ * Get instances of a given class
+ * @param {Term} classUri - URI of the class
+ * @returns {Grapoi} Grapoi object containing instance nodes
+ */
+  getClassInstances(classUri) {
+    console.log(`Getting instances of class: ${classUri.value}`);
+    try {
+      // Find all nodes that have rdf:type with value of classUri
+      const instances = this.grapoi.node(classUri).in(this.namespaces.rdf.type);
+      console.log(`Found ${instances.values ? instances.values.length : 'unknown number of'} instances`);
+      return instances;
+    } catch (error) {
+      console.error(`Error getting instances of class ${classUri.value}:`, error);
+      return { values: [] }; // Return empty result on error
+    }
+  }
 }
 
 export default RDFModel;

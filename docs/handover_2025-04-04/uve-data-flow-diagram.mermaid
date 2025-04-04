@@ -1,0 +1,28 @@
+sequenceDiagram
+    participant User
+    participant Storage as Storage Layer
+    participant RDFModel as RDF Model
+    participant ConceptModel as Concept Model
+    participant EventBus as Event Bus
+    participant ThreeView as Three.js View
+    participant RDFView as RDF File View
+    
+    User->>RDFView: Load or edit RDF data
+    RDFView->>Storage: Read/write data
+    RDFView->>RDFModel: Update model
+    RDFModel->>EventBus: Publish rdf-model-changed
+    EventBus->>ConceptModel: Notify of RDF changes
+    ConceptModel->>ConceptModel: Transform RDF to entities
+    ConceptModel->>EventBus: Publish concept-model-changed
+    EventBus->>ThreeView: Notify of concept changes
+    ThreeView->>ThreeView: Update visualization
+    
+    User->>ThreeView: Interact with objects
+    ThreeView->>EventBus: Publish object events
+    EventBus->>ConceptModel: Update selected state
+    EventBus->>ThreeView: Update visual appearance
+    
+    User->>ThreeView: Enter class sphere
+    ThreeView->>ThreeView: Navigate to internal view
+    ThreeView->>EventBus: Publish class-entered
+    EventBus->>ThreeView: Update navigation controls

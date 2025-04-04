@@ -76,42 +76,60 @@ class ConceptModel {
    * @private
    */
   _loadClasses() {
-    const classNodes = this.rdfModel.getClasses();
-    console.log('Loading classes from RDF model, classNodes type:', typeof classNodes);
+    console.log('Loading classes and class instances from RDF model');
 
-    // Debug output of classNodes
-    console.log('classNodes methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(classNodes)));
-    console.log('Is Grapoi object:', classNodes.constructor.name);
+    // First load the class definitions
+    this._loadClassDefinitions();
 
-    // Handle Grapoi objects properly
-    // We need to use forEach method of Grapoi or convert to array if it has values property
-    if (classNodes && typeof classNodes.forEach === 'function') {
-      console.log('Using Grapoi forEach method');
-
-      // Use Grapoi's own forEach method
-      classNodes.forEach(classNode => {
-        this._processClassNode(classNode);
-      });
-    } else if (classNodes && Array.isArray(classNodes.values)) {
-      console.log('Using values array from Grapoi object');
-
-      // Use the values array
-      classNodes.values.forEach(classNode => {
-        this._processClassNode(classNode);
-      });
-    } else {
-      console.error('classNodes is not iterable:', classNodes);
-      // Attempt to handle as single node if possible
-      if (classNodes && classNodes.term) {
-        this._processClassNode(classNodes);
-      }
-    }
+    // Then load instances of those classes
+    this._loadClassInstances();
 
     // Now that all classes are loaded, find subclass relationships
     console.log('Loading subclass relationships');
     this._loadSubclassRelationships();
 
     console.log(`Loaded ${this.classes.size} classes`);
+  }
+
+  /**
+   * Load RDF class definitions
+   * @private
+   */
+  _loadClassDefinitions() {
+    try {
+      const classNodes = this.rdfModel.getClasses();
+      console.log('Loading class definitions, classNodes type:', typeof classNodes);
+
+      // Debug output of classNodes
+      console.log('classNodes methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(classNodes)));
+      console.log('Is Grapoi object:', classNodes.constructor.name);
+
+      // Handle Grapoi objects properly
+      // We need to use forEach method of Grapoi or convert to array if it has values property
+      if (classNodes && typeof classNodes.forEach === 'function') {
+        console.log('Using Grapoi forEach method');
+
+        // Use Grapoi's own forEach method
+        classNodes.forEach(classNode => {
+          this._processClassNode(classNode);
+        });
+      } else if (classNodes && Array.isArray(classNodes.values)) {
+        console.log('Using values array from Grapoi object');
+
+        // Use the values array
+        classNodes.values.forEach(classNode => {
+          this._processClassNode(classNode);
+        });
+      } else {
+        console.error('classNodes is not iterable:', classNodes);
+        // Attempt to handle as single node if possible
+        if (classNodes && classNodes.term) {
+          this._processClassNode(classNodes);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading class definitions:', error);
+    }
   }
 
   /**
@@ -164,6 +182,104 @@ class ConceptModel {
       console.log(`Loaded class: ${label} (${uriString})`);
     } catch (error) {
       console.error('Error processing class node:', error);
+    }
+  }
+
+  /**
+   * Load instances of RDF classes
+   * @private
+   */
+  _loadClassInstances() {
+    try {
+      // For each class we've found
+      for (const classEntity of this.classes.values()) {
+        console.log(`Looking for instances of class: ${classEntity.label}`);
+
+        // Get all instances of this class
+        try {
+          const instanceNodes = this.rdfModel.getClassInstances(classEntity.uri);
+
+          if (instanceNodes && typeof instanceNodes.forEach === 'function') {
+            console.log('Using Grapoi forEach for instances');
+            instanceNodes.forEach(instanceNode => {
+              this._processInstanceNode(instanceNode, classEntity);
+            });
+          } else if (instanceNodes && Array.isArray(instanceNodes.values)) {
+            console.log('Using values array for instances');
+            instanceNodes.values.forEach(instanceNode => {
+              this._processInstanceNode(instanceNode, classEntity);
+            });
+          } else {
+            console.log('No instances found or not iterable:', instanceNodes);
+          }
+        } catch (error) {
+          console.warn(`Error getting instances for class ${classEntity.label}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading class instances:', error);
+    }
+  }
+
+  /**
+   * Process a class instance node
+   * @param {Object} instanceNode - Instance node
+   * @param {ClassEntity} parentClassEntity - Parent class entity
+   * @private
+   */
+  _processInstanceNode(instanceNode, parentClassEntity) {
+    try {
+      const uri = instanceNode.term;
+      const uriString = uri.value;
+
+      console.log('Processing instance:', uriString, 'of class', parentClassEntity.label);
+
+      // Skip if we already have this instance
+      if (this.classes.has(uriString)) {
+        console.log('Instance already processed, skipping:', uriString);
+        return;
+      }
+
+      // Get label for the instance
+      let label = this._extractLabelFromUri(uriString);
+      try {
+        // Try to get foaf:name first for FOAF instances
+        const names = instanceNode.out(this.rdfModel.namespaces.foaf.name);
+        if (names && names.values && names.values.length > 0) {
+          label = names.values[0];
+        } else {
+          // Fall back to rdfs:label
+          const labels = instanceNode.out(this.rdfModel.namespaces.rdfs.label);
+          if (labels && labels.values && labels.values.length > 0) {
+            label = labels.values[0];
+          }
+        }
+      } catch (error) {
+        console.warn(`Error getting label for instance ${uriString}:`, error);
+      }
+
+      // Create class entity for this instance
+      const classEntity = new ClassEntity({
+        uri,
+        label,
+        subclasses: []
+      });
+
+      // Add properties
+      try {
+        const properties = this.rdfModel.getProperties(uri);
+        properties.forEach(property => {
+          classEntity.addProperty(property);
+        });
+      } catch (error) {
+        console.warn(`Error getting properties for instance ${uriString}:`, error);
+      }
+
+      this.classes.set(uriString, classEntity);
+      this.log.debug(`Loaded instance: ${label} (${uriString}) of class ${parentClassEntity.label}`);
+      console.log(`Loaded instance: ${label} (${uriString}) of class ${parentClassEntity.label}`);
+    } catch (error) {
+      console.error('Error processing instance node:', error);
     }
   }
 
@@ -566,7 +682,7 @@ class ConceptModel {
    * @returns {Array<RelationshipEntity>} Relationships involving the class
    */
   getClassRelationships(classUri) {
-    const uriString = typeof classUri === 'string' ? classUri : classUri.value;
+    const uriString = typeof classUri === 'string' ? classUri : uri.value;
 
     return Array.from(this.relationships.values()).filter(rel => {
       return rel.sourceClassUri.value === uriString || rel.targetClassUri.value === uriString;
@@ -579,7 +695,7 @@ class ConceptModel {
    * @returns {Array<InterfaceEntity>} Interfaces for the class
    */
   getClassInterfaces(classUri) {
-    const uriString = typeof classUri === 'string' ? classUri : classUri.value;
+    const uriString = typeof classUri === 'string' ? classUri : uri.value;
 
     return Array.from(this.interfaces.values()).filter(intf => {
       return intf.classUri.value === uriString;

@@ -1,0 +1,76 @@
+classDiagram
+    class StorageService {
+        <<abstract>>
+        +read(id, options)
+        +write(id, data, options)
+        +delete(id, options)
+        +list(path, options)
+        +query(filters, options)
+    }
+    
+    class FSStorageService {
+        -fs
+        -basePath
+        +constructor(fs, basePath)
+        -_getPath(id)
+        +read(id, options)
+        +write(id, data, options)
+        +delete(id)
+        +list(path, options)
+        +query(filters, options)
+    }
+    
+    class SPARQLStorageService {
+        -endpoint
+        -graphUri
+        -headers
+        -timeout
+        -prefix
+        +constructor(endpoint, graphUri, options)
+        -_getResourceUri(id)
+        -_executeSparql(query, isUpdate)
+        +read(id, options)
+        +write(id, data, options)
+        +delete(id)
+        +list(type, options)
+        +query(filters, options)
+        -_uriToId(uri)
+        -_objectToTriples(id, obj)
+        -_createTriple(subject, predicate, object)
+        -_simplifyJsonLd(jsonld)
+    }
+    
+    class StorageManager {
+        -storageServices: Map
+        -defaultService
+        +constructor()
+        +setupDefaultStorage()
+        +registerService(name, service)
+        +setDefaultService(name)
+        +getService(name)
+        +readFile(path, options)
+        +writeFile(path, data, options)
+        +delete(path)
+        +exists(path)
+        +list(path)
+        +query(filters, options)
+    }
+    
+    class MockFS {
+        +readFile(path, options)
+        +writeFile(path, data, options)
+        +unlink(path)
+        +exists(path)
+        +readdir(path)
+        +isDirectory(path)
+        +mkdir(path)
+        +reset()
+    }
+    
+    StorageService <|-- FSStorageService
+    StorageService <|-- SPARQLStorageService
+    StorageManager --> "many" StorageService
+    FSStorageService --> MockFS
+    
+    note for StorageManager "Provides unified access to storage\nand backward compatibility with window.fs"
+    note for SPARQLStorageService "Connects to remote SPARQL endpoint\nfor RDF triple store access"
