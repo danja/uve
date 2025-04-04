@@ -21,9 +21,11 @@ class ConceptModel {
     this.relationships = new Map(); // URI string -> RelationshipEntity
     this.interfaces = new Map(); // URI string -> InterfaceEntity
     this.log = log.getLogger('ConceptModel');
-    
+
     // Subscribe to RDF model changes
     eventBus.subscribe('rdf-model-changed', () => this.updateFromRDF());
+
+    console.log('ConceptModel created');
   }
 
   /**
@@ -31,29 +33,41 @@ class ConceptModel {
    */
   updateFromRDF() {
     this.log.info('Updating conceptual model from RDF data');
-    
+    console.log('Updating conceptual model from RDF data');
+
     // Clear current entities
     this.classes.clear();
     this.relationships.clear();
     this.interfaces.clear();
-    
+
+    console.log('Loading classes...');
     // Load classes
     this._loadClasses();
-    
+
+    console.log('Loading relationships...');
     // Load relationships between classes
     this._loadRelationships();
-    
+
+    console.log('Loading interfaces...');
     // Load interfaces
     this._loadInterfaces();
-    
+
+    console.log('Assigning positions...');
     // Assign positions to classes (simple circle layout for now)
     this._assignPositions();
-    
+
     // Notify that the concept model has changed
+    console.log('Publishing concept-model-changed event');
     eventBus.publish('concept-model-changed', {
       classes: Array.from(this.classes.values()),
       relationships: Array.from(this.relationships.values()),
       interfaces: Array.from(this.interfaces.values())
+    });
+
+    console.log('ConceptModel updated with:', {
+      classes: this.classes.size,
+      relationships: this.relationships.size,
+      interfaces: this.interfaces.size
     });
   }
 
@@ -63,58 +77,142 @@ class ConceptModel {
    */
   _loadClasses() {
     const classNodes = this.rdfModel.getClasses();
-    
-    classNodes.forEach(classNode => {
+    console.log('Loading classes from RDF model, classNodes type:', typeof classNodes);
+
+    // Debug output of classNodes
+    console.log('classNodes methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(classNodes)));
+    console.log('Is Grapoi object:', classNodes.constructor.name);
+
+    // Handle Grapoi objects properly
+    // We need to use forEach method of Grapoi or convert to array if it has values property
+    if (classNodes && typeof classNodes.forEach === 'function') {
+      console.log('Using Grapoi forEach method');
+
+      // Use Grapoi's own forEach method
+      classNodes.forEach(classNode => {
+        this._processClassNode(classNode);
+      });
+    } else if (classNodes && Array.isArray(classNodes.values)) {
+      console.log('Using values array from Grapoi object');
+
+      // Use the values array
+      classNodes.values.forEach(classNode => {
+        this._processClassNode(classNode);
+      });
+    } else {
+      console.error('classNodes is not iterable:', classNodes);
+      // Attempt to handle as single node if possible
+      if (classNodes && classNodes.term) {
+        this._processClassNode(classNodes);
+      }
+    }
+
+    // Now that all classes are loaded, find subclass relationships
+    console.log('Loading subclass relationships');
+    this._loadSubclassRelationships();
+
+    console.log(`Loaded ${this.classes.size} classes`);
+  }
+
+  /**
+   * Process a single class node from RDF
+   * @param {Object} classNode - Grapoi node for a class
+   * @private
+   */
+  _processClassNode(classNode) {
+    try {
       const uri = classNode.term;
       const uriString = uri.value;
-      
+
+      console.log('Processing class node:', uriString);
+
       // Skip if we already have this class
       if (this.classes.has(uriString)) {
         return;
       }
-      
+
       // Get label for the class
-      const labels = classNode.out(this.rdfModel.namespaces.rdfs.label);
-      const label = labels.values[0] || this._extractLabelFromUri(uriString);
-      
+      let label = this._extractLabelFromUri(uriString);
+      try {
+        const labels = classNode.out(this.rdfModel.namespaces.rdfs.label);
+        if (labels && labels.values && labels.values.length > 0) {
+          label = labels.values[0];
+        }
+      } catch (error) {
+        console.warn(`Error getting label for class ${uriString}:`, error);
+      }
+
       // Create class entity
-      const classEntity = new ClassEntity({ 
-        uri, 
+      const classEntity = new ClassEntity({
+        uri,
         label,
         subclasses: []
       });
-      
+
       // Add properties
-      const properties = this.rdfModel.getProperties(uri);
-      properties.forEach(property => {
-        classEntity.addProperty(property);
-      });
-      
+      try {
+        const properties = this.rdfModel.getProperties(uri);
+        properties.forEach(property => {
+          classEntity.addProperty(property);
+        });
+      } catch (error) {
+        console.warn(`Error getting properties for class ${uriString}:`, error);
+      }
+
       this.classes.set(uriString, classEntity);
       this.log.debug(`Loaded class: ${label} (${uriString})`);
-    });
-    
-    // Now that all classes are loaded, find subclass relationships
-    this._loadSubclassRelationships();
+      console.log(`Loaded class: ${label} (${uriString})`);
+    } catch (error) {
+      console.error('Error processing class node:', error);
+    }
   }
-  
+
   /**
    * Load subclass relationships
    * @private
    */
   _loadSubclassRelationships() {
     for (const classEntity of this.classes.values()) {
-      const subclasses = this.rdfModel.getSubclasses(classEntity.uri);
-      
-      subclasses.forEach(subclass => {
-        const subclassUri = subclass.term;
-        const subclassUriString = subclassUri.value;
-        
-        // Only process if the subclass is a known class
-        if (this.classes.has(subclassUriString)) {
-          classEntity.addSubclass(subclassUri);
+      try {
+        const subclasses = this.rdfModel.getSubclasses(classEntity.uri);
+
+        if (subclasses && typeof subclasses.forEach === 'function') {
+          // Use Grapoi's forEach
+          subclasses.forEach(subclass => {
+            this._processSubclass(classEntity, subclass);
+          });
+        } else if (subclasses && Array.isArray(subclasses.values)) {
+          // Use values array
+          subclasses.values.forEach(subclass => {
+            this._processSubclass(classEntity, subclass);
+          });
+        } else {
+          console.warn(`Subclasses for ${classEntity.label} is not iterable:`, subclasses);
+          // Try as single node
+          if (subclasses && subclasses.term) {
+            this._processSubclass(classEntity, subclasses);
+          }
         }
-      });
+      } catch (error) {
+        console.error(`Error loading subclasses for ${classEntity.label}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Process a single subclass
+   * @param {ClassEntity} classEntity - Parent class
+   * @param {Object} subclass - Subclass node
+   * @private
+   */
+  _processSubclass(classEntity, subclass) {
+    const subclassUri = subclass.term;
+    const subclassUriString = subclassUri.value;
+
+    // Only process if the subclass is a known class
+    if (this.classes.has(subclassUriString)) {
+      classEntity.addSubclass(subclassUri);
+      console.log(`Added subclass ${subclassUriString} to ${classEntity.label}`);
     }
   }
 
@@ -124,31 +222,49 @@ class ConceptModel {
    */
   _loadRelationships() {
     const relationships = this.rdfModel.getRelationships();
-    
+    console.log('Loading relationships:', relationships);
+
+    if (!relationships || !Array.isArray(relationships)) {
+      console.warn('No relationships found or invalid format:', relationships);
+      return;
+    }
+
     relationships.forEach(rel => {
-      const { property, domain, range } = rel;
-      const propertyUriString = property.value;
-      
-      // Skip if we already have this relationship
-      if (this.relationships.has(propertyUriString)) {
-        return;
+      try {
+        const { property, domain, range } = rel;
+        const propertyUriString = property.value;
+
+        // Skip if we already have this relationship
+        if (this.relationships.has(propertyUriString)) {
+          return;
+        }
+
+        // Get label for the relationship
+        let label = this._extractLabelFromUri(propertyUriString);
+        try {
+          const propertyNode = this.rdfModel.grapoi.node(property);
+          const labels = propertyNode.out(this.rdfModel.namespaces.rdfs.label);
+          if (labels && labels.values && labels.values.length > 0) {
+            label = labels.values[0];
+          }
+        } catch (error) {
+          console.warn(`Error getting label for relationship ${propertyUriString}:`, error);
+        }
+
+        // Create relationship entity
+        const relationshipEntity = new RelationshipEntity({
+          uri: property,
+          label,
+          sourceClassUri: domain,
+          targetClassUri: range
+        });
+
+        this.relationships.set(propertyUriString, relationshipEntity);
+        this.log.debug(`Loaded relationship: ${label} (${propertyUriString})`);
+        console.log(`Loaded relationship: ${label} (${propertyUriString})`);
+      } catch (error) {
+        console.error('Error processing relationship:', error);
       }
-      
-      // Get label for the relationship
-      const propertyNode = this.rdfModel.grapoi.node(property);
-      const labels = propertyNode.out(this.rdfModel.namespaces.rdfs.label);
-      const label = labels.values[0] || this._extractLabelFromUri(propertyUriString);
-      
-      // Create relationship entity
-      const relationshipEntity = new RelationshipEntity({
-        uri: property,
-        label,
-        sourceClassUri: domain,
-        targetClassUri: range
-      });
-      
-      this.relationships.set(propertyUriString, relationshipEntity);
-      this.log.debug(`Loaded relationship: ${label} (${propertyUriString})`);
     });
   }
 
@@ -157,44 +273,90 @@ class ConceptModel {
    * @private
    */
   _loadInterfaces() {
-    const interfaceType = this.rdfModel.namedNode(config.rdf.types.interface);
-    const interfaces = this.rdfModel.grapoi.node(interfaceType).in(this.rdfModel.namespaces.rdf.type);
-    
-    interfaces.forEach(interfaceNode => {
+    try {
+      const interfaceType = this.rdfModel.namedNode(config.rdf.types.interface);
+      const interfaces = this.rdfModel.grapoi.node(interfaceType).in(this.rdfModel.namespaces.rdf.type);
+      console.log('Loading interfaces, type:', typeof interfaces);
+
+      if (interfaces && typeof interfaces.forEach === 'function') {
+        // Use Grapoi's forEach
+        interfaces.forEach(interfaceNode => {
+          this._processInterface(interfaceNode);
+        });
+      } else if (interfaces && Array.isArray(interfaces.values)) {
+        // Use values array
+        interfaces.values.forEach(interfaceNode => {
+          this._processInterface(interfaceNode);
+        });
+      } else {
+        console.warn('Interfaces is not iterable:', interfaces);
+        // Try as single node
+        if (interfaces && interfaces.term) {
+          this._processInterface(interfaces);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading interfaces:', error);
+    }
+  }
+
+  /**
+   * Process a single interface node
+   * @param {Object} interfaceNode - Interface node
+   * @private
+   */
+  _processInterface(interfaceNode) {
+    try {
       const uri = interfaceNode.term;
       const uriString = uri.value;
-      
+
       // Skip if we already have this interface
       if (this.interfaces.has(uriString)) {
         return;
       }
-      
+
       // Get label for the interface
-      const labels = interfaceNode.out(this.rdfModel.namespaces.rdfs.label);
-      const label = labels.values[0] || this._extractLabelFromUri(uriString);
-      
+      let label = this._extractLabelFromUri(uriString);
+      try {
+        const labels = interfaceNode.out(this.rdfModel.namespaces.rdfs.label);
+        if (labels && labels.values && labels.values.length > 0) {
+          label = labels.values[0];
+        }
+      } catch (error) {
+        console.warn(`Error getting label for interface ${uriString}:`, error);
+      }
+
       // Find the class this interface belongs to
-      const classNodes = interfaceNode.in(this.rdfModel.namespaces.uve.hasInterface);
-      
-      if (classNodes.values.length === 0) {
+      let classUri = null;
+      try {
+        const classNodes = interfaceNode.in(this.rdfModel.namespaces.uve.hasInterface);
+        if (classNodes && classNodes.values && classNodes.values.length > 0) {
+          classUri = classNodes.term;
+        }
+      } catch (error) {
+        console.warn(`Error finding class for interface ${uriString}:`, error);
+      }
+
+      if (!classUri) {
         this.log.warn(`Interface ${label} (${uriString}) not attached to any class`);
+        console.warn(`Interface ${label} (${uriString}) not attached to any class`);
         return;
       }
-      
-      const classUri = classNodes.term;
+
       const classUriString = classUri.value;
-      
+
       if (!this.classes.has(classUriString)) {
         this.log.warn(`Interface ${label} attached to unknown class ${classUriString}`);
+        console.warn(`Interface ${label} attached to unknown class ${classUriString}`);
         return;
       }
-      
+
       // Create random spherical position
       const position = {
         phi: Math.random() * Math.PI * 2, // 0 to 2π
         theta: Math.random() * Math.PI // 0 to π
       };
-      
+
       // Create interface entity
       const interfaceEntity = new InterfaceEntity({
         uri,
@@ -202,46 +364,135 @@ class ConceptModel {
         classUri,
         position
       });
-      
+
       // Add methods to the interface (if any)
-      const methods = interfaceNode.out(this.rdfModel.namespaces.uve.hasMethod);
-      
-      methods.forEach(methodNode => {
-        const methodName = methodNode.out(this.rdfModel.namespaces.rdfs.label).values[0] ||
-                          methodNode.term.value.split('#').pop().split('/').pop();
-        
-        const methodParams = [];
-        const paramNodes = methodNode.out(this.rdfModel.namespaces.uve.hasParameter);
-        
-        paramNodes.forEach(paramNode => {
-          const paramName = paramNode.out(this.rdfModel.namespaces.rdfs.label).values[0] ||
-                           paramNode.term.value.split('#').pop().split('/').pop();
-          
-          const paramType = paramNode.out(this.rdfModel.namespaces.uve.hasType).values[0] || 'any';
-          
-          methodParams.push({
-            name: paramName,
-            type: paramType
+      try {
+        const methods = interfaceNode.out(this.rdfModel.namespaces.uve.hasMethod);
+
+        if (methods && typeof methods.forEach === 'function') {
+          methods.forEach(methodNode => {
+            this._processInterfaceMethod(methodNode, interfaceEntity);
           });
-        });
-        
-        const returnType = methodNode.out(this.rdfModel.namespaces.uve.hasReturnType).values[0] || 'void';
-        
-        interfaceEntity.addMethod({
-          name: methodName,
-          parameters: methodParams,
-          returnType
-        });
-      });
-      
+        } else if (methods && Array.isArray(methods.values)) {
+          methods.values.forEach(methodNode => {
+            this._processInterfaceMethod(methodNode, interfaceEntity);
+          });
+        }
+      } catch (error) {
+        console.warn(`Error processing methods for interface ${uriString}:`, error);
+      }
+
       this.interfaces.set(uriString, interfaceEntity);
-      
+
       // Add interface to class
       const classEntity = this.classes.get(classUriString);
       classEntity.addInterface(uri);
-      
+
       this.log.debug(`Loaded interface: ${label} (${uriString}) for class ${classEntity.label}`);
-    });
+      console.log(`Loaded interface: ${label} (${uriString}) for class ${classEntity.label}`);
+    } catch (error) {
+      console.error('Error processing interface:', error);
+    }
+  }
+
+  /**
+   * Process a method on an interface
+   * @param {Object} methodNode - Method node
+   * @param {InterfaceEntity} interfaceEntity - Interface entity
+   * @private
+   */
+  _processInterfaceMethod(methodNode, interfaceEntity) {
+    try {
+      // Get method name
+      let methodName = methodNode.term.value.split('#').pop().split('/').pop();
+      try {
+        const labels = methodNode.out(this.rdfModel.namespaces.rdfs.label);
+        if (labels && labels.values && labels.values.length > 0) {
+          methodName = labels.values[0];
+        }
+      } catch (error) {
+        console.warn(`Error getting name for method:`, error);
+      }
+
+      const methodParams = [];
+
+      // Get parameters
+      try {
+        const paramNodes = methodNode.out(this.rdfModel.namespaces.uve.hasParameter);
+
+        if (paramNodes && typeof paramNodes.forEach === 'function') {
+          paramNodes.forEach(paramNode => {
+            this._processMethodParameter(paramNode, methodParams);
+          });
+        } else if (paramNodes && Array.isArray(paramNodes.values)) {
+          paramNodes.values.forEach(paramNode => {
+            this._processMethodParameter(paramNode, methodParams);
+          });
+        }
+      } catch (error) {
+        console.warn(`Error processing parameters for method ${methodName}:`, error);
+      }
+
+      // Get return type
+      let returnType = 'void';
+      try {
+        const returnTypes = methodNode.out(this.rdfModel.namespaces.uve.hasReturnType);
+        if (returnTypes && returnTypes.values && returnTypes.values.length > 0) {
+          returnType = returnTypes.values[0];
+        }
+      } catch (error) {
+        console.warn(`Error getting return type for method ${methodName}:`, error);
+      }
+
+      interfaceEntity.addMethod({
+        name: methodName,
+        parameters: methodParams,
+        returnType
+      });
+
+      console.log(`Added method ${methodName} to interface ${interfaceEntity.label}`);
+    } catch (error) {
+      console.error('Error processing method:', error);
+    }
+  }
+
+  /**
+   * Process a parameter on a method
+   * @param {Object} paramNode - Parameter node
+   * @param {Array} methodParams - Array to add the parameter to
+   * @private
+   */
+  _processMethodParameter(paramNode, methodParams) {
+    try {
+      // Get parameter name
+      let paramName = paramNode.term.value.split('#').pop().split('/').pop();
+      try {
+        const labels = paramNode.out(this.rdfModel.namespaces.rdfs.label);
+        if (labels && labels.values && labels.values.length > 0) {
+          paramName = labels.values[0];
+        }
+      } catch (error) {
+        console.warn(`Error getting name for parameter:`, error);
+      }
+
+      // Get parameter type
+      let paramType = 'any';
+      try {
+        const types = paramNode.out(this.rdfModel.namespaces.uve.hasType);
+        if (types && types.values && types.values.length > 0) {
+          paramType = types.values[0];
+        }
+      } catch (error) {
+        console.warn(`Error getting type for parameter ${paramName}:`, error);
+      }
+
+      methodParams.push({
+        name: paramName,
+        type: paramType
+      });
+    } catch (error) {
+      console.error('Error processing parameter:', error);
+    }
   }
 
   /**
@@ -251,29 +502,33 @@ class ConceptModel {
   _assignPositions() {
     const classes = Array.from(this.classes.values());
     const classCount = classes.length;
-    
+
     if (classCount === 0) {
       return;
     }
-    
+
+    console.log(`Assigning positions to ${classCount} classes`);
+
     // For a single class, place it at origin
     if (classCount === 1) {
       classes[0].position = { x: 0, y: 0, z: 0 };
       return;
     }
-    
+
     // For multiple classes, arrange in a circle on the XZ plane
     const radius = Math.max(30, classCount * 5);
     const angleStep = (Math.PI * 2) / classCount;
-    
+
     classes.forEach((classEntity, index) => {
       const angle = index * angleStep;
-      
+
       classEntity.position = {
         x: radius * Math.sin(angle),
         y: 0,
         z: radius * Math.cos(angle)
       };
+
+      console.log(`Positioned class ${classEntity.label} at (${classEntity.position.x.toFixed(2)}, ${classEntity.position.y.toFixed(2)}, ${classEntity.position.z.toFixed(2)})`);
     });
   }
 
@@ -286,12 +541,12 @@ class ConceptModel {
   _extractLabelFromUri(uri) {
     // Try to extract the fragment
     let label = uri.split('#').pop();
-    
+
     // If no fragment, try the last path segment
     if (label === uri) {
       label = uri.split('/').pop();
     }
-    
+
     return label;
   }
 
@@ -312,7 +567,7 @@ class ConceptModel {
    */
   getClassRelationships(classUri) {
     const uriString = typeof classUri === 'string' ? classUri : classUri.value;
-    
+
     return Array.from(this.relationships.values()).filter(rel => {
       return rel.sourceClassUri.value === uriString || rel.targetClassUri.value === uriString;
     });
@@ -325,7 +580,7 @@ class ConceptModel {
    */
   getClassInterfaces(classUri) {
     const uriString = typeof classUri === 'string' ? classUri : classUri.value;
-    
+
     return Array.from(this.interfaces.values()).filter(intf => {
       return intf.classUri.value === uriString;
     });
