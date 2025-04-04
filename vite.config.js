@@ -12,5 +12,7 @@ export default defineConfig({
     alias: {
       '@': '/src'
     }
-  }
+  },
+  root: './', // Use project root
+  publicDir: 'public'
 });

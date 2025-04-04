@@ -12,6 +12,9 @@ import Sphere from './components/sphere.js';
 import Pipe from './components/pipe.js';
 import Port from './components/port.js';
 
+// Added debugging
+console.log('ThreeView module loading');
+
 class ThreeView {
   /**
    * Create a ThreeView
@@ -19,6 +22,11 @@ class ThreeView {
    * @param {HTMLElement} container - DOM element to render into
    */
   constructor(conceptModel, container) {
+    console.log('ThreeView constructor', {
+      conceptModel: conceptModel ? 'provided' : 'missing',
+      container: container ? 'provided' : 'missing'
+    });
+
     this.conceptModel = conceptModel;
     this.container = container;
     this.log = log.getLogger('ThreeView');
@@ -35,7 +43,10 @@ class ThreeView {
     window.addEventListener('resize', this.onResize.bind(this));
 
     // Subscribe to model changes
-    eventBus.subscribe('concept-model-changed', () => this.updateFromModel());
+    eventBus.subscribe('concept-model-changed', (data) => {
+      console.log('concept-model-changed event received in ThreeView', data);
+      this.updateFromModel();
+    });
 
     // Subscribe to object selection
     eventBus.subscribe('object-selected', this.onObjectSelected.bind(this));
@@ -49,31 +60,36 @@ class ThreeView {
     this.animate = this.animate.bind(this);
     this.clock = new THREE.Clock();
     this.animate();
+
+    console.log('ThreeView construction complete');
   }
 
   /**
    * Initialize THREE.js renderer, scene, and camera
    */
   initThree() {
+    console.log('Initializing Three.js');
+
     // Create renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
     this.container.appendChild(this.renderer.domElement);
+    console.log('Renderer created and added to container');
 
     // Create scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x111133);
-
-    // Add these lines to src/view/threeView/threeView.js in the initThree() method
-    // after creating the scene:
+    console.log('Scene created with background color');
 
     // Add debug grid and axes to help with orientation
     const gridHelper = new THREE.GridHelper(20, 20);
     this.scene.add(gridHelper);
+    console.log('Grid helper added');
 
     const axesHelper = new THREE.AxesHelper(5);
     this.scene.add(axesHelper);
+    console.log('Axes helper added');
 
     // Add a simple sphere to verify rendering is working
     const debugSphere = new THREE.Mesh(
@@ -82,8 +98,8 @@ class ThreeView {
     );
     debugSphere.position.set(0, 0, 0);
     this.scene.add(debugSphere);
+    console.log('Debug sphere added at origin (0,0,0)');
 
-    console.log('Debug objects added to scene');
     // Create camera
     this.camera = new THREE.PerspectiveCamera(
       config.visualization.camera.fov,
@@ -96,9 +112,12 @@ class ThreeView {
       config.visualization.camera.position.y,
       config.visualization.camera.position.z
     );
+    console.log('Camera created at position', this.camera.position);
 
     // Create controls
+    console.log('Creating Controls');
     this.controls = new Controls(this.camera, this.renderer.domElement);
+    console.log('Controls created');
 
     // Add lights
     this.addLights();
@@ -108,14 +127,18 @@ class ThreeView {
     this.pipesGroup = new THREE.Group();
     this.scene.add(this.spheresGroup);
     this.scene.add(this.pipesGroup);
+    console.log('Sphere and pipe groups added to scene');
 
     this.log.debug('THREE.js initialized');
+    console.log('THREE.js initialization complete');
   }
 
   /**
    * Add lights to the scene
    */
   addLights() {
+    console.log('Adding lights to scene');
+
     // Add ambient light
     const ambientLight = new THREE.AmbientLight(0x404040);
     this.scene.add(ambientLight);
@@ -133,6 +156,8 @@ class ThreeView {
     const pointLight2 = new THREE.PointLight(0xffffff, 0.5);
     pointLight2.position.set(-50, -50, -50);
     this.scene.add(pointLight2);
+
+    console.log('Lights added to scene');
   }
 
   /**
@@ -140,29 +165,38 @@ class ThreeView {
    */
   updateFromModel() {
     this.log.info('Updating ThreeView from conceptual model');
+    console.log('Updating ThreeView from conceptual model');
 
     // Clear current visualization
     this.clearVisualization();
 
     // If we're showing a specific class's internals
     if (this.currentClassUri) {
+      console.log('Rendering internals for class:', this.currentClassUri);
       this.renderClassInternals(this.currentClassUri);
     } else {
       // Render all top-level classes
+      console.log('Rendering all top-level classes');
       this.renderClasses();
 
       // Render relationships between classes
+      console.log('Rendering relationships between classes');
       this.renderRelationships();
 
       // Render interfaces on classes
+      console.log('Rendering interfaces on classes');
       this.renderInterfaces();
     }
+
+    console.log('ThreeView update complete');
   }
 
   /**
    * Clear the current visualization
    */
   clearVisualization() {
+    console.log('Clearing visualization');
+
     // Dispose and clear spheres
     for (const sphere of this.spheres.values()) {
       sphere.dispose();
@@ -180,15 +214,23 @@ class ThreeView {
       port.dispose();
     }
     this.ports.clear();
+
+    console.log('Visualization cleared');
   }
 
   /**
    * Render all classes in the conceptual model
    */
   renderClasses() {
+    console.log('Rendering classes from conceptual model');
+    console.log('Classes in model:', this.conceptModel.classes.size);
+
     for (const classEntity of this.conceptModel.classes.values()) {
+      console.log('Rendering class:', classEntity.label);
       this.renderClass(classEntity);
     }
+
+    console.log('Classes rendering complete');
   }
 
   /**
@@ -198,33 +240,48 @@ class ThreeView {
    */
   renderClass(classEntity) {
     const uriString = classEntity.uri.value;
+    console.log('Rendering class:', classEntity.label, uriString);
 
     // Skip if we already have this class
     if (this.spheres.has(uriString)) {
+      console.log('Class already rendered, skipping:', uriString);
       return this.spheres.get(uriString);
     }
 
     // Create sphere for the class
-    const sphere = new Sphere({
-      classEntity,
-      parent: this.spheresGroup
-    });
+    try {
+      console.log('Creating sphere for class:', classEntity.label);
+      const sphere = new Sphere({
+        classEntity,
+        parent: this.spheresGroup
+      });
 
-    // Store the sphere
-    this.spheres.set(uriString, sphere);
+      // Store the sphere
+      this.spheres.set(uriString, sphere);
 
-    this.log.debug(`Rendered class: ${classEntity.label} (${uriString})`);
+      this.log.debug(`Rendered class: ${classEntity.label} (${uriString})`);
+      console.log(`Rendered class: ${classEntity.label} (${uriString})`);
 
-    return sphere;
+      return sphere;
+    } catch (error) {
+      console.error('Error creating sphere for class:', classEntity.label, error);
+      return null;
+    }
   }
 
   /**
    * Render relationships between classes
    */
   renderRelationships() {
+    console.log('Rendering relationships');
+    console.log('Relationships in model:', this.conceptModel.relationships.size);
+
     for (const relationshipEntity of this.conceptModel.relationships.values()) {
+      console.log('Rendering relationship:', relationshipEntity.label);
       this.renderRelationship(relationshipEntity);
     }
+
+    console.log('Relationships rendering complete');
   }
 
   /**
@@ -234,9 +291,11 @@ class ThreeView {
    */
   renderRelationship(relationshipEntity) {
     const uriString = relationshipEntity.uri.value;
+    console.log('Rendering relationship:', relationshipEntity.label, uriString);
 
     // Skip if we already have this relationship
     if (this.pipes.has(uriString)) {
+      console.log('Relationship already rendered, skipping:', uriString);
       return this.pipes.get(uriString);
     }
 
@@ -246,6 +305,9 @@ class ThreeView {
     // Skip if we don't have the source or target class
     if (!this.spheres.has(sourceUriString) || !this.spheres.has(targetUriString)) {
       this.log.warn(`Cannot render relationship ${uriString}: missing source or target class`);
+      console.warn(`Cannot render relationship ${uriString}: missing ` +
+        (this.spheres.has(sourceUriString) ? '' : 'source ') +
+        (this.spheres.has(targetUriString) ? '' : 'target'));
       return null;
     }
 
@@ -254,28 +316,41 @@ class ThreeView {
     const targetSphere = this.spheres.get(targetUriString);
 
     // Create pipe for the relationship
-    const pipe = new Pipe({
-      relationshipEntity,
-      sourceSphere,
-      targetSphere,
-      parent: this.pipesGroup
-    });
+    try {
+      console.log('Creating pipe for relationship:', relationshipEntity.label);
+      const pipe = new Pipe({
+        relationshipEntity,
+        sourceSphere,
+        targetSphere,
+        parent: this.pipesGroup
+      });
 
-    // Store the pipe
-    this.pipes.set(uriString, pipe);
+      // Store the pipe
+      this.pipes.set(uriString, pipe);
 
-    this.log.debug(`Rendered relationship: ${relationshipEntity.label} (${uriString})`);
+      this.log.debug(`Rendered relationship: ${relationshipEntity.label} (${uriString})`);
+      console.log(`Rendered relationship: ${relationshipEntity.label} (${uriString})`);
 
-    return pipe;
+      return pipe;
+    } catch (error) {
+      console.error('Error creating pipe for relationship:', relationshipEntity.label, error);
+      return null;
+    }
   }
 
   /**
    * Render interfaces on classes
    */
   renderInterfaces() {
+    console.log('Rendering interfaces');
+    console.log('Interfaces in model:', this.conceptModel.interfaces.size);
+
     for (const interfaceEntity of this.conceptModel.interfaces.values()) {
+      console.log('Rendering interface:', interfaceEntity.label);
       this.renderInterface(interfaceEntity);
     }
+
+    console.log('Interfaces rendering complete');
   }
 
   /**
@@ -285,9 +360,11 @@ class ThreeView {
    */
   renderInterface(interfaceEntity) {
     const uriString = interfaceEntity.uri.value;
+    console.log('Rendering interface:', interfaceEntity.label, uriString);
 
     // Skip if we already have this interface
     if (this.ports.has(uriString)) {
+      console.log('Interface already rendered, skipping:', uriString);
       return this.ports.get(uriString);
     }
 
@@ -296,6 +373,7 @@ class ThreeView {
     // Skip if we don't have the class
     if (!this.spheres.has(classUriString)) {
       this.log.warn(`Cannot render interface ${uriString}: missing class ${classUriString}`);
+      console.warn(`Cannot render interface ${uriString}: missing class ${classUriString}`);
       return null;
     }
 
@@ -303,17 +381,24 @@ class ThreeView {
     const parentSphere = this.spheres.get(classUriString);
 
     // Create port for the interface
-    const port = new Port({
-      interfaceEntity,
-      parentSphere
-    });
+    try {
+      console.log('Creating port for interface:', interfaceEntity.label);
+      const port = new Port({
+        interfaceEntity,
+        parentSphere
+      });
 
-    // Store the port
-    this.ports.set(uriString, port);
+      // Store the port
+      this.ports.set(uriString, port);
 
-    this.log.debug(`Rendered interface: ${interfaceEntity.label} (${uriString})`);
+      this.log.debug(`Rendered interface: ${interfaceEntity.label} (${uriString})`);
+      console.log(`Rendered interface: ${interfaceEntity.label} (${uriString})`);
 
-    return port;
+      return port;
+    } catch (error) {
+      console.error('Error creating port for interface:', interfaceEntity.label, error);
+      return null;
+    }
   }
 
   /**
@@ -325,10 +410,12 @@ class ThreeView {
 
     if (!classEntity) {
       this.log.error(`Cannot render internals for unknown class ${classUriString}`);
+      console.error(`Cannot render internals for unknown class ${classUriString}`);
       return;
     }
 
     this.log.info(`Rendering internals for class ${classEntity.label} (${classUriString})`);
+    console.log(`Rendering internals for class ${classEntity.label} (${classUriString})`);
 
     // Render subclasses
     for (const subclassUri of classEntity.subclasses) {
@@ -359,6 +446,8 @@ class ThreeView {
         this.renderInterface(interfaceEntity);
       }
     }
+
+    console.log('Class internals rendering complete');
   }
 
   /**
@@ -370,6 +459,7 @@ class ThreeView {
 
     if (!classEntity) {
       this.log.error(`Cannot enter unknown class ${classUriString}`);
+      console.error(`Cannot enter unknown class ${classUriString}`);
       return;
     }
 
@@ -391,6 +481,7 @@ class ThreeView {
     this.updateFromModel();
 
     this.log.info(`Entered class ${classEntity.label} (${classUriString})`);
+    console.log(`Entered class ${classEntity.label} (${classUriString})`);
     eventBus.publish('class-entered', { classEntity });
   }
 
@@ -400,6 +491,7 @@ class ThreeView {
   exitClass() {
     if (this.navigationStack.length === 0) {
       this.log.warn('Cannot exit class: navigation stack is empty');
+      console.warn('Cannot exit class: navigation stack is empty');
       return;
     }
 
@@ -418,6 +510,7 @@ class ThreeView {
     this.updateFromModel();
 
     this.log.info(`Exited class ${exitingClassEntity?.label || 'unknown'}`);
+    console.log(`Exited class ${exitingClassEntity?.label || 'unknown'}`);
     eventBus.publish('class-exited', { classEntity: exitingClassEntity });
   }
 
@@ -430,6 +523,7 @@ class ThreeView {
    */
   onObjectSelected(data) {
     const { type, uri } = data;
+    console.log('onObjectSelected:', type, uri);
 
     if (type === 'class') {
       const classEntity = this.conceptModel.getClass(uri);
@@ -478,6 +572,7 @@ class ThreeView {
    */
   onObjectDeselected(data) {
     const { type, uri } = data;
+    console.log('onObjectDeselected:', type, uri);
 
     if (type === 'class') {
       const classEntity = this.conceptModel.getClass(uri);

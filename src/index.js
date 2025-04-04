@@ -8,4 +8,4 @@ import './util/initFs.js';
 // Import main application
 import './app.js';
 
-console.log('UVE application bootstrapped');
+console.log('UVE application bootstrapped from src/index.js');

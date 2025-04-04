@@ -4,14 +4,130 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>UVE - Universal Virtual Environment</title>
-  <link rel="stylesheet" href="/src/styles/main.css">
+  <style>
+    /* Basic reset and container styles */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body, html {
+      height: 100%;
+      width: 100%;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    
+    /* Main layout */
+    .app-container {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+    
+    .view-container {
+      flex: 1;
+      position: relative;
+      height: 100%;
+    }
+    
+    /* Three.js view styles */
+    #three-view-container {
+      flex: 3;
+      background-color: #111;
+    }
+    
+    /* RDF view styles */
+    #rdf-view-container {
+      flex: 1;
+      background-color: #f5f5f5;
+    }
+    
+    /* Navigation buttons */
+    .enter-class-button,
+    .exit-class-button {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      padding: 10px 15px;
+      background-color: rgba(52, 152, 219, 0.8);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      z-index: 1000;
+      transition: background-color 0.3s ease;
+    }
+    
+    .enter-class-button:hover,
+    .exit-class-button:hover {
+      background-color: rgba(41, 128, 185, 0.9);
+    }
+    
+    .hidden {
+      display: none;
+    }
+  </style>
 </head>
 <body>
   <div class="app-container">
     <div id="three-view-container" class="view-container"></div>
-    <div class="view-divider"></div>
     <div id="rdf-view-container" class="view-container"></div>
   </div>
-  <script type="module" src="/src/app.js"></script>
+  
+  <!-- Debug controls -->
+  <div style="position: fixed; top: 10px; left: 10px; z-index: 1000; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; color: white;">
+    <h3>Debug Controls</h3>
+    <button id="debugButton" style="padding: 5px 10px; margin-top: 5px;">Show Debug Info</button>
+  </div>
+  
+  <!-- Debug output -->
+  <div id="debugOutput" style="display: none; position: fixed; top: 10px; right: 10px; width: 300px; max-height: 80vh; overflow-y: auto; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; color: white; font-family: monospace; font-size: 12px; z-index: 1000;"></div>
+  
+  <script type="module" src="src/index.js"></script>
+  
+  <script>
+    // Add debug helpers
+    document.getElementById('debugButton').addEventListener('click', function() {
+      const debugOutput = document.getElementById('debugOutput');
+      debugOutput.style.display = debugOutput.style.display === 'none' ? 'block' : 'none';
+      
+      // Collect debug info
+      const debugInfo = {
+        windowSize: {
+          innerWidth: window.innerWidth,
+          innerHeight: window.innerHeight
+        },
+        containers: {
+          threeViewExists: !!document.getElementById('three-view-container'),
+          threeViewSize: {
+            width: document.getElementById('three-view-container')?.clientWidth,
+            height: document.getElementById('three-view-container')?.clientHeight
+          },
+          rdfViewExists: !!document.getElementById('rdf-view-container'),
+          rdfViewSize: {
+            width: document.getElementById('rdf-view-container')?.clientWidth,
+            height: document.getElementById('rdf-view-container')?.clientHeight
+          }
+        },
+        app: {
+          exists: !!window.app,
+          rdfModel: window.app?.rdfModel ? 'exists' : 'missing',
+          conceptModel: window.app?.conceptModel ? 'exists' : 'missing',
+          threeView: window.app?.threeView ? 'exists' : 'missing',
+          rdfView: window.app?.rdfView ? 'exists' : 'missing'
+        },
+        scene: window.app?.threeView?.scene ? {
+          children: window.app.threeView.scene.children.length,
+          background: window.app.threeView.scene.background ? window.app.threeView.scene.background.getHexString() : 'none'
+        } : 'missing'
+      };
+      
+      debugOutput.innerHTML = '<h3>Debug Information</h3><pre>' + 
+        JSON.stringify(debugInfo, null, 2) + '</pre>';
+    });
+  </script>
 </body>
 </html>

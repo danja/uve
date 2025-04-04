@@ -1,317 +1,215 @@
 /**
- * FOAF (Friend of a Friend) example implementation for UVE
- * Vanilla JavaScript version
+ * FOAF (Friend of a Friend) example data
+ * Creates a set of 5 friends with relationships
+ * @module examples/foafExample
  */
 
-// Add to UVE namespace
-window.UVE = window.UVE || {};
+import rdf from 'rdf-ext';
+import storageManager from '../util/storageManager.js';
 
-// FOAF example module
-UVE.FOAF = {};
+// Add debugging
+console.log('foafExample.js loading');
 
 /**
- * Create a FOAF dataset with 5 friends
- * @returns {Object} Dataset containing FOAF data
+ * Create a FOAF example dataset with 5 friends
+ * @returns {Dataset} RDF dataset with FOAF data
  */
-UVE.FOAF.createFOAFExample = function () {
-  console.log('Creating FOAF example data');
+export function createFOAFExample() {
+  console.log('Creating FOAF example dataset');
+  const dataset = rdf.dataset();
 
-  // Define people data
-  const people = [
+  // Define namespaces
+  const ns = {
+    rdf: rdf.namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#'),
+    rdfs: rdf.namespace('http://www.w3.org/2000/01/rdf-schema#'),
+    foaf: rdf.namespace('http://xmlns.com/foaf/0.1/'),
+    xsd: rdf.namespace('http://www.w3.org/2001/XMLSchema#'),
+    ex: rdf.namespace('http://example.org/'),
+    uve: rdf.namespace('http://uve.example.org/ns#')
+  };
+
+  // Define FOAF classes
+  dataset.add(rdf.quad(ns.foaf.Person, ns.rdf.type, ns.rdfs.Class));
+  dataset.add(rdf.quad(ns.foaf.Person, ns.rdfs.label, rdf.literal('Person')));
+
+  dataset.add(rdf.quad(ns.foaf.Group, ns.rdf.type, ns.rdfs.Class));
+  dataset.add(rdf.quad(ns.foaf.Group, ns.rdfs.label, rdf.literal('Group')));
+
+  dataset.add(rdf.quad(ns.foaf.Organization, ns.rdf.type, ns.rdfs.Class));
+  dataset.add(rdf.quad(ns.foaf.Organization, ns.rdfs.label, rdf.literal('Organization')));
+
+  // Add interface to Person
+  dataset.add(rdf.quad(ns.ex.Identifiable, ns.rdf.type, ns.uve.Interface));
+  dataset.add(rdf.quad(ns.ex.Identifiable, ns.rdfs.label, rdf.literal('Identifiable')));
+  dataset.add(rdf.quad(ns.foaf.Person, ns.uve.hasInterface, ns.ex.Identifiable));
+
+  // Add methods to the interface
+  const getIdMethod = rdf.blankNode();
+  dataset.add(rdf.quad(ns.ex.Identifiable, ns.uve.hasMethod, getIdMethod));
+  dataset.add(rdf.quad(getIdMethod, ns.rdfs.label, rdf.literal('getId')));
+  dataset.add(rdf.quad(getIdMethod, ns.uve.hasReturnType, rdf.literal('string')));
+
+  // Add Social interface to Person
+  dataset.add(rdf.quad(ns.ex.Social, ns.rdf.type, ns.uve.Interface));
+  dataset.add(rdf.quad(ns.ex.Social, ns.rdfs.label, rdf.literal('Social')));
+  dataset.add(rdf.quad(ns.foaf.Person, ns.uve.hasInterface, ns.ex.Social));
+
+  // Add methods to the Social interface
+  const addFriendMethod = rdf.blankNode();
+  dataset.add(rdf.quad(ns.ex.Social, ns.uve.hasMethod, addFriendMethod));
+  dataset.add(rdf.quad(addFriendMethod, ns.rdfs.label, rdf.literal('addFriend')));
+  dataset.add(rdf.quad(addFriendMethod, ns.uve.hasReturnType, rdf.literal('void')));
+
+  const friendParam = rdf.blankNode();
+  dataset.add(rdf.quad(addFriendMethod, ns.uve.hasParameter, friendParam));
+  dataset.add(rdf.quad(friendParam, ns.rdfs.label, rdf.literal('friend')));
+  dataset.add(rdf.quad(friendParam, ns.uve.hasType, rdf.literal('Person')));
+
+  // Define FOAF properties
+  dataset.add(rdf.quad(ns.foaf.name, ns.rdf.type, ns.rdf.Property));
+  dataset.add(rdf.quad(ns.foaf.name, ns.rdfs.label, rdf.literal('name')));
+  dataset.add(rdf.quad(ns.foaf.name, ns.rdfs.domain, ns.foaf.Person));
+  dataset.add(rdf.quad(ns.foaf.name, ns.rdfs.range, ns.xsd.string));
+
+  dataset.add(rdf.quad(ns.foaf.mbox, ns.rdf.type, ns.rdf.Property));
+  dataset.add(rdf.quad(ns.foaf.mbox, ns.rdfs.label, rdf.literal('email')));
+  dataset.add(rdf.quad(ns.foaf.mbox, ns.rdfs.domain, ns.foaf.Person));
+  dataset.add(rdf.quad(ns.foaf.mbox, ns.rdfs.range, ns.xsd.string));
+
+  dataset.add(rdf.quad(ns.foaf.knows, ns.rdf.type, ns.rdf.Property));
+  dataset.add(rdf.quad(ns.foaf.knows, ns.rdfs.label, rdf.literal('knows')));
+  dataset.add(rdf.quad(ns.foaf.knows, ns.rdfs.domain, ns.foaf.Person));
+  dataset.add(rdf.quad(ns.foaf.knows, ns.rdfs.range, ns.foaf.Person));
+
+  dataset.add(rdf.quad(ns.foaf.member, ns.rdf.type, ns.rdf.Property));
+  dataset.add(rdf.quad(ns.foaf.member, ns.rdfs.label, rdf.literal('member')));
+  dataset.add(rdf.quad(ns.foaf.member, ns.rdfs.domain, ns.foaf.Group));
+  dataset.add(rdf.quad(ns.foaf.member, ns.rdfs.range, ns.foaf.Person));
+
+  // Create 5 friends
+  const friends = [
     {
-      id: 'alice',
-      label: 'Alice Smith',
-      email: 'alice@example.org',
-      interests: ['Semantic Web', 'Artificial Intelligence', 'Rock Climbing'],
-      knows: ['bob', 'charlie', 'dave']
+      uri: ns.ex('alice'),
+      name: 'Alice',
+      email: 'alice@example.org'
     },
     {
-      id: 'bob',
-      label: 'Bob Johnson',
-      email: 'bob@example.org',
-      interests: ['Machine Learning', 'Photography', 'Chess'],
-      knows: ['alice', 'charlie', 'eve']
+      uri: ns.ex('bob'),
+      name: 'Bob',
+      email: 'bob@example.org'
     },
     {
-      id: 'charlie',
-      label: 'Charlie Brown',
-      email: 'charlie@example.org',
-      interests: ['Data Science', 'Piano', 'Hiking'],
-      knows: ['alice', 'bob', 'dave']
+      uri: ns.ex('charlie'),
+      name: 'Charlie',
+      email: 'charlie@example.org'
     },
     {
-      id: 'dave',
-      label: 'Dave Williams',
-      email: 'dave@example.org',
-      interests: ['Virtual Reality', 'Guitar', 'Mountain Biking'],
-      knows: ['alice', 'charlie']
+      uri: ns.ex('diana'),
+      name: 'Diana',
+      email: 'diana@example.org'
     },
     {
-      id: 'eve',
-      label: 'Eve Davis',
-      email: 'eve@example.org',
-      interests: ['Cryptography', 'Painting', 'Yoga'],
-      knows: ['bob']
+      uri: ns.ex('eve'),
+      name: 'Eve',
+      email: 'eve@example.org'
     }
   ];
 
-  // Create a class for Person
-  const personClass = {
-    id: 'Person',
-    label: 'Person',
-    type: 'class',
-    description: 'A person in the FOAF network',
-    properties: ['name', 'email', 'knows', 'interests']
-  };
-
-  // Create relationship types
-  const relationships = [];
-
-  // Process people and create relationships
-  people.forEach(person => {
-    person.type = 'Person';
-    person.uri = `http://example.org/people/${person.id}`;
-
-    // Add knows relationships
-    person.knows.forEach(friendId => {
-      relationships.push({
-        source: person.id,
-        target: friendId,
-        type: 'knows',
-        label: 'knows'
-      });
-    });
+  // Add friend data to dataset
+  friends.forEach(friend => {
+    dataset.add(rdf.quad(friend.uri, ns.rdf.type, ns.foaf.Person));
+    dataset.add(rdf.quad(friend.uri, ns.foaf.name, rdf.literal(friend.name)));
+    dataset.add(rdf.quad(friend.uri, ns.foaf.mbox, rdf.literal(friend.email)));
   });
 
-  return {
-    classes: [personClass, ...people],
-    relationships: relationships
-  };
-};
+  // Create friendships (not all combinations, just some examples)
+  // Alice knows Bob and Charlie
+  dataset.add(rdf.quad(ns.ex('alice'), ns.foaf.knows, ns.ex('bob')));
+  dataset.add(rdf.quad(ns.ex('alice'), ns.foaf.knows, ns.ex('charlie')));
 
-/**
- * Load the FOAF example into UVE
- * @param {UVE.UVEApp} app - UVE application instance
- */
-UVE.FOAF.loadFOAFExample = function (app) {
-  console.log('Loading FOAF example into app', app);
+  // Bob knows Alice and Diana
+  dataset.add(rdf.quad(ns.ex('bob'), ns.foaf.knows, ns.ex('alice')));
+  dataset.add(rdf.quad(ns.ex('bob'), ns.foaf.knows, ns.ex('diana')));
 
-  // Clear any existing objects
-  app.clearScene();
+  // Charlie knows Alice and Eve
+  dataset.add(rdf.quad(ns.ex('charlie'), ns.foaf.knows, ns.ex('alice')));
+  dataset.add(rdf.quad(ns.ex('charlie'), ns.foaf.knows, ns.ex('eve')));
 
-  // Create the FOAF dataset
-  const dataset = UVE.FOAF.createFOAFExample();
-  console.log('FOAF dataset created', dataset);
+  // Diana knows Bob and Eve
+  dataset.add(rdf.quad(ns.ex('diana'), ns.foaf.knows, ns.ex('bob')));
+  dataset.add(rdf.quad(ns.ex('diana'), ns.foaf.knows, ns.ex('eve')));
 
-  // Load it into the model manager
-  app.modelManager.loadData(dataset);
+  // Eve knows Charlie and Diana
+  dataset.add(rdf.quad(ns.ex('eve'), ns.foaf.knows, ns.ex('charlie')));
+  dataset.add(rdf.quad(ns.ex('eve'), ns.foaf.knows, ns.ex('diana')));
 
-  // Create spheres for each person
-  UVE.FOAF.createPersonSpheres(app, dataset);
+  // Create a group
+  dataset.add(rdf.quad(ns.ex('friends-group'), ns.rdf.type, ns.foaf.Group));
+  dataset.add(rdf.quad(ns.ex('friends-group'), ns.foaf.name, rdf.literal('Friends Group')));
 
-  // Notify that data has been loaded
-  app.eventBus.publish(new UVE.UVEEvent('rdf:loaded', {
-    source: 'foaf-example',
-    size: dataset.classes.length
-  }));
-};
-
-/**
- * Create 3D spheres for people in the FOAF example
- * @param {UVE.UVEApp} app - UVE application instance
- * @param {Object} dataset - The FOAF dataset
- */
-UVE.FOAF.createPersonSpheres = function (app, dataset) {
-  console.log('Creating person spheres', { app, dataset });
-
-  // Filter for only person instances (not the class definition)
-  const people = dataset.classes.filter(item => item.type === 'Person');
-  console.log('Found people:', people);
-
-  // Color palette for spheres
-  const colors = [0x3498db, 0xe74c3c, 0x2ecc71, 0xf39c12, 0x9b59b6];
-
-  // Create a sphere for each person
-  people.forEach((person, index) => {
-    // Calculate position in a circle
-    const angle = (index / people.length) * Math.PI * 2;
-    const radius = 8;
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
-
-    // Create geometry
-    const geometry = new THREE.SphereGeometry(1.5, 32, 32);
-
-    // Create material with unique color
-    const material = new THREE.MeshStandardMaterial({
-      color: colors[index % colors.length],
-      transparent: true,
-      opacity: 0.8,
-      metalness: 0.2,
-      roughness: 0.5
-    });
-
-    // Create mesh
-    const sphere = new THREE.Mesh(geometry, material);
-    sphere.position.set(x, 0, z);
-
-    // Store metadata
-    sphere.userData = {
-      personId: person.id,
-      name: person.label,
-      email: person.email,
-      interests: person.interests
-    };
-
-    // Add to scene
-    app.scene.add(sphere);
-    app.objects.set(person.id, sphere);
-    console.log(`Added sphere for ${person.label} at position (${x}, 0, ${z})`);
-
-    // Add label above the sphere
-    UVE.FOAF.addPersonLabel(app, sphere, person.label);
+  // Add all friends to the group
+  friends.forEach(friend => {
+    dataset.add(rdf.quad(ns.ex('friends-group'), ns.foaf.member, friend.uri));
   });
 
-  // Create relationship lines
-  UVE.FOAF.createRelationshipLines(app, dataset);
-};
+  // Save this dataset to storage for later retrieval
+  saveFOAFExample(dataset);
+
+  console.log(`FOAF example dataset created with ${dataset.size} triples`);
+  return dataset;
+}
 
 /**
- * Add a text label above a person sphere
- * @param {UVE.UVEApp} app - UVE application instance
- * @param {THREE.Mesh} sphere - The person's sphere
- * @param {string} name - Person's name
+ * Save FOAF example dataset to storage
+ * @param {Dataset} dataset - The dataset to save
  */
-UVE.FOAF.addPersonLabel = function (app, sphere, name) {
-  // Create canvas for text
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d');
-  canvas.width = 256;
-  canvas.height = 128;
+async function saveFOAFExample(dataset) {
+  try {
+    // Create a serializer for Turtle format
+    const serializer = new rdf.formats.serializers.TurtleSerializer();
+    const turtleData = await serializer.serialize(dataset);
 
-  // Fill background
-  context.fillStyle = 'rgba(255, 255, 255, 0.8)';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Add text
-  context.font = 'bold 24px Arial';
-  context.fillStyle = '#000000';
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText(name, canvas.width / 2, canvas.height / 2);
-
-  // Create texture
-  const texture = new THREE.CanvasTexture(canvas);
-
-  // Create sprite material
-  const material = new THREE.SpriteMaterial({
-    map: texture,
-    transparent: true
-  });
-
-  // Create sprite
-  const sprite = new THREE.Sprite(material);
-  sprite.scale.set(2.5, 1.25, 1);
-  sprite.position.y = 2.5; // Position above sphere
-
-  // Add to sphere
-  sphere.add(sprite);
-};
+    // Save to storage
+    await storageManager.writeFile('examples/foaf.ttl', turtleData);
+    console.log('FOAF example saved to storage');
+  } catch (error) {
+    console.error('Error saving FOAF example:', error);
+  }
+}
 
 /**
- * Create relationship lines between people
- * @param {UVE.UVEApp} app - UVE application instance
- * @param {Object} dataset - The FOAF dataset
+ * Load FOAF example dataset from storage
+ * @returns {Promise<Dataset>} The loaded dataset
  */
-UVE.FOAF.createRelationshipLines = function (app, dataset) {
-  console.log('Creating relationship lines');
+export async function loadFOAFExample() {
+  console.log('Attempting to load FOAF example from storage');
+  try {
+    // Check if example exists in storage
+    const exists = await storageManager.exists('examples/foaf.ttl');
+    console.log('FOAF example exists in storage:', exists);
 
-  // Create a line for each relationship
-  dataset.relationships.forEach(rel => {
-    const sourceSphere = app.objects.get(rel.source);
-    const targetSphere = app.objects.get(rel.target);
+    if (exists) {
+      // Load from storage
+      const turtleData = await storageManager.readFile('examples/foaf.ttl', { encoding: 'utf8' });
+      console.log('FOAF data loaded from storage, parsing...');
 
-    if (sourceSphere && targetSphere) {
-      // Create points for the line
-      const sourcePos = sourceSphere.position.clone();
-      const targetPos = targetSphere.position.clone();
-
-      // Create a curved line
-      const mid = sourcePos.clone().add(targetPos).multiplyScalar(0.5);
-      mid.y += 2; // Add a slight curve upward
-
-      // Create a curve
-      const curve = new THREE.QuadraticBezierCurve3(
-        sourcePos,
-        mid,
-        targetPos
-      );
-
-      // Create points along the curve
-      const points = curve.getPoints(20);
-
-      // Create geometry
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-
-      // Create material
-      const material = new THREE.LineBasicMaterial({
-        color: 0x999999,
-        linewidth: 2
-      });
-
-      // Create line
-      const line = new THREE.Line(geometry, material);
-
-      // Add to scene
-      app.scene.add(line);
-      console.log(`Added relationship line from ${rel.source} to ${rel.target}`);
-
-      // Add relationship label
-      UVE.FOAF.addRelationshipLabel(app, mid, rel.label);
+      // Parse the Turtle data
+      const parser = new rdf.formats.parsers.TurtleParser();
+      const dataset = await parser.parse(turtleData);
+      console.log(`FOAF dataset parsed with ${dataset.size} triples`);
+      return dataset;
     } else {
-      console.warn(`Missing spheres for relationship: ${rel.source} -> ${rel.target}`);
+      // Create new example if not found
+      console.log('FOAF example not found in storage, creating new one');
+      return createFOAFExample();
     }
-  });
-};
+  } catch (error) {
+    console.error('Error loading FOAF example:', error);
+    // Fall back to creating a new example
+    console.log('Falling back to creating a new FOAF example');
+    return createFOAFExample();
+  }
+}
 
-/**
- * Add a label to a relationship line
- * @param {UVE.UVEApp} app - UVE application instance
- * @param {THREE.Vector3} position - Position of the label
- * @param {string} text - Label text
- */
-UVE.FOAF.addRelationshipLabel = function (app, position, text) {
-  // Create canvas for text
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d');
-  canvas.width = 128;
-  canvas.height = 64;
-
-  // Fill background
-  context.fillStyle = 'rgba(255, 255, 255, 0.7)';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Add text
-  context.font = '16px Arial';
-  context.fillStyle = '#000000';
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText(text, canvas.width / 2, canvas.height / 2);
-
-  // Create texture
-  const texture = new THREE.CanvasTexture(canvas);
-
-  // Create sprite material
-  const material = new THREE.SpriteMaterial({
-    map: texture,
-    transparent: true
-  });
-
-  // Create sprite
-  const sprite = new THREE.Sprite(material);
-  sprite.scale.set(1.5, 0.75, 1);
-  sprite.position.copy(position);
-
-  // Add to scene
-  app.scene.add(sprite);
-};
+// Also provide a default export for backward compatibility
+export default createFOAFExample;
